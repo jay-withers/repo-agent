@@ -1,0 +1,128 @@
+"""The walking skeleton, end to end against a mock transport."""
+
+from __future__ import annotations
+
+import httpx
+
+from repoagent import digest
+from repoagent.jobs import scan
+from tests.helpers import route_client
+
+_REPOS = {
+    "total_count": 2,
+    "repositories": [
+        {
+            "name": "market-agent",
+            "full_name": "jay-withers/market-agent",
+            "description": "AI paper trading",
+            "default_branch": "main",
+            "archived": False,
+            "pushed_at": "2026-09-18T08:00:00Z",
+            "topics": ["azure", "python"],
+            "license": {"key": "mit"},
+            "html_url": "https://github.com/jay-withers/market-agent",
+        },
+        {
+            "name": "git-demo",
+            "full_name": "jay-withers/git-demo",
+            "description": None,
+            "default_branch": "main",
+            "archived": False,
+            "pushed_at": "2026-08-31T10:00:00Z",
+            "topics": [],
+            "license": None,
+            "html_url": "https://github.com/jay-withers/git-demo",
+        },
+    ],
+}
+
+_AUTH_ROUTES = {
+    "/app/installations/1/access_tokens": httpx.Response(
+        201, json={"token": "ghs_x", "expires_at": "2099-01-01T00:00:00Z"}
+    ),
+    "/app/installations": httpx.Response(200, json=[{"id": 1}]),
+}
+
+
+def test_render_reads_every_repo_and_sends_nothing() -> None:
+    calls: list[httpx.Request] = []
+    client = route_client(
+        {**_AUTH_ROUTES, "/installation/repositories": httpx.Response(200, json=_REPOS)},
+        calls=calls,
+    )
+
+    result = scan.run(send_email=False, http=client)
+
+    assert [r.name for r in result.repos] == ["market-agent", "git-demo"]
+    assert not any("resend" in str(c.url) for c in calls)
+
+
+def test_scan_skips_the_email_when_no_recipient_is_configured() -> None:
+    """The default, and it must not read as a failure.
+
+    conftest deletes DIGEST_EMAIL_TO and KEY_VAULT_URI, so this is the path a
+    developer gets with no configuration at all.
+    """
+    calls: list[httpx.Request] = []
+    client = route_client(
+        {**_AUTH_ROUTES, "/installation/repositories": httpx.Response(200, json=_REPOS)},
+        calls=calls,
+    )
+
+    result = scan.run(send_email=True, http=client)
+
+    assert len(result.repos) == 2
+    assert not any("resend" in str(c.url) for c in calls)
+
+
+def test_scan_sends_when_a_recipient_is_configured(monkeypatch) -> None:
+    monkeypatch.setenv("DIGEST_EMAIL_TO", "someone@example.com")
+    from repoagent import settings as settings_module
+
+    settings_module.optional_secret.cache_clear()
+
+    calls: list[httpx.Request] = []
+    client = route_client(
+        {
+            **_AUTH_ROUTES,
+            "/installation/repositories": httpx.Response(200, json=_REPOS),
+            "api.resend.com": httpx.Response(200, json={"id": "mail_1"}),
+        },
+        calls=calls,
+    )
+
+    scan.run(send_email=True, http=client)
+
+    sent = [c for c in calls if "resend" in str(c.url)]
+    assert len(sent) == 1
+
+
+def test_digest_reports_counts_from_the_data_not_from_prose() -> None:
+    result = scan.run(
+        send_email=False,
+        http=route_client(
+            {**_AUTH_ROUTES, "/installation/repositories": httpx.Response(200, json=_REPOS)}
+        ),
+    )
+
+    assert "Scanned 2 repositories" in digest.render_text(result)
+    assert digest.subject(result) == "repo-agent — 2 repos, nothing to flag"
+    # The repository with no description is flagged as such in the listing.
+    assert "no description" in digest.render_text(result)
+
+
+def test_digest_carries_the_image_tag(monkeypatch) -> None:
+    """Which build produced this digest.
+
+    With the job's Terraform in one repository and the image in another,
+    "what actually ran" is otherwise cross-repo archaeology.
+    """
+    monkeypatch.setenv("IMAGE_TAG", "v0.1.0")
+    result = scan.run(
+        send_email=False,
+        http=route_client(
+            {**_AUTH_ROUTES, "/installation/repositories": httpx.Response(200, json=_REPOS)}
+        ),
+    )
+    assert "v0.1.0" in digest.render_text(result)
+    assert "v0.1.0" in digest.render_html(result)

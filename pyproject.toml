@@ -1,0 +1,65 @@
+[project]
+name = "repoagent"
+version = "0.1.0"
+description = "Scans GitHub repositories for improvements and checks Renovate is working, then emails a digest"
+requires-python = ">=3.12"
+
+# One package, one image, two entrypoints (scan, render). Dependencies are added
+# as the modules that need them land rather than declared up front — the
+# Anthropic SDK arrives with the triage step, which does not exist yet.
+dependencies = [
+  "pydantic>=2.9",
+  "pydantic-settings>=2.5",
+  "azure-identity>=1.19",
+  "azure-keyvault-secrets>=4.9",
+  "httpx>=0.28",
+  # GitHub App authentication signs an RS256 JWT, which needs the crypto extra —
+  # PyJWT alone ships only the HMAC algorithms and fails at runtime with
+  # "Algorithm 'RS256' could not be found".
+  "pyjwt[crypto]>=2.9",
+  # Telemetry. The distro brings the exporter plus logging and Azure SDK
+  # instrumentation; httpx is separate because the distro does not carry it, and
+  # it is what turns the GitHub and Resend calls into dependency spans.
+  "azure-monitor-opentelemetry>=1.6",
+  "opentelemetry-instrumentation-httpx>=0.50b0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "ruff>=0.8",
+]
+
+# What the Dockerfile's ENTRYPOINT resolves to. Terraform deliberately does not
+# repeat this name — see cli.py.
+[project.scripts]
+repoagent = "repoagent.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/repoagent"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+  "E", "W",  # pycodestyle
+  "F",       # pyflakes
+  "I",       # import sorting
+  "UP",      # pyupgrade
+  "B",       # bugbear
+  "SIM",     # simplify
+  "RUF",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# A warning here is a defect: this process runs unattended once a week, so
+# anything worth warning about is something nobody will be reading the logs to
+# see.
+filterwarnings = ["error"]
