@@ -130,9 +130,9 @@ next run, with no redeploy.
 ## Deploying
 
 ```bash
-make build IMAGE_TAG=v0.1.0
-make push  IMAGE_TAG=v0.1.0
-make deploy IMAGE_TAG=v0.1.0
+make build IMAGE_TAG=v0.0.1
+make push  IMAGE_TAG=v0.0.1
+make deploy IMAGE_TAG=v0.0.1
 make start                     # a scheduled job has no other way to be triggered
 ```
 
@@ -165,8 +165,12 @@ pulls it:
 1. Apply `azure-container-apps` (dev).
 2. Create the GitHub App and install it.
 3. Merge to `main` here — `cd-tag` mints a version, `cd-publish` pushes the image.
-4. **Make the GHCR package public.** New packages default to private regardless
-   of repository visibility, and the job has no pull secret.
+4. **Check the GHCR package is public** — the job has no pull secret, so a
+   private package fails the pull. On the first release here it was already
+   public and linked to the repository, which the
+   `org.opencontainers.image.source` label in the Dockerfile is what earns.
+   Worth confirming rather than assuming:
+   `gh api user/packages/container/repo-agent%2Frepoagent --jq .visibility`
 5. `make apply ENV=dev`.
 6. `make secrets`, and run what it prints.
 7. `make start`, then check the digest arrived.

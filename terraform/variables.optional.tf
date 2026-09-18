@@ -56,7 +56,11 @@ variable "image_registry" {
 variable "image_tag" {
   description = "Image tag seeding the job's **first** revision only. After that the container's image and env are under `lifecycle.ignore_changes` and `make deploy` owns them, so a plan against an existing job reports no change here even when the running image has moved on. Don't read this as the deployed version; check `az containerapp job show`."
   type        = string
-  default     = "v0.1.0"
+  # Must name a tag that actually exists in the registry. cd-tag's first
+  # release on a repo with no prior tags is v0.0.1, not v0.1.0 — and a tag that
+  # does not exist fails at revision start-up on the image pull, long after both
+  # plan and apply have reported success.
+  default = "v0.0.1"
 
   validation {
     # A moving tag deploys nothing: Container Apps creates a revision only when
