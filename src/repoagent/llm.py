@@ -113,7 +113,7 @@ anywhere. Rules for them:
 7. Never suggest something the scanner already checks: Renovate configuration \
 and PR backlogs, README, LICENCE, description, CI presence, repository \
 staleness, catalogue membership, Terraform lock platforms, action pinning, \
-runner versions, shared Renovate preset.
+runner versions, shared Renovate preset, required checks nothing reports.
 8. Be specific to what you were shown. "Add tests" is worthless; "the Dockerfile \
 installs build tools into the runtime stage" is worth reading.
 9. At most four. Fewer is better. An empty list is a fine answer.

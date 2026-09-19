@@ -71,6 +71,9 @@ def snapshot(**overrides: object) -> RepoSnapshot:
         "workflows": (workflow(),),
         "terraform_lock": None,
         "in_catalogue": True,
+        # What HEALTHY_WORKFLOW's one job reports, so the default repository
+        # satisfies its own required checks.
+        "required_checks": ("test",),
         "open_prs": (),
         "last_release": "v1.0.0",
         "last_release_at": datetime.now(UTC) - timedelta(days=10),

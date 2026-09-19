@@ -217,6 +217,24 @@ provider block** — one per platform locked — and `zh:` entries are the
 registry's zip hashes, present regardless, so counting those proves nothing.
 `test_platform_names_are_never_looked_for_in_a_lock_file` pins this.
 
+**`estate.unreportable_required_check` compares the two halves of that
+catalogue.** It reads `required_status_checks` out of the same block the
+repository names come from, and asks whether any workflow in the repository can
+produce each context. The failure it exists for is the worst one branch
+protection has, and a silent one: a required check that never reports leaves
+every pull request *pending* rather than failing it, so nothing merges except by
+bypassing the ruleset — azure-landingzone required `terraform / Terraform` while
+its workflows reported `ci-terraform`, and its Renovate backlog reached six
+before anyone noticed the merges had all been bypasses.
+
+It is deliberately half a check, because `<caller job id> / <reusable job name>`
+has one half in another repository. Only the caller job id is verified; a
+renamed job inside `jay-withers/workflows` would still slip through. Verifying
+the far half means fetching that repository's workflows too — worth doing only
+if that failure ever actually happens. Job ids are read with a regex on
+two-space indentation rather than with a YAML dependency, the same trade as
+`parse_catalogue` not being an HCL parser.
+
 Workflow **contents** are fetched, not just filenames, because whether an action
 is pinned to a commit and which runner a job asks for are answered by the text
 and nothing else. They are deliberately **not** sent to the triage prompt —
