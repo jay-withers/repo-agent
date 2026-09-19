@@ -108,6 +108,34 @@ class Finding:
 
 
 @dataclass(frozen=True)
+class TriageUsage:
+    """What one triage call consumed, and what is left to pay for the next.
+
+    `cost_usd` is an **estimate** computed from a price table in `llm.py`;
+    `balance_usd` is whatever DeepSeek's own balance endpoint reported, which is
+    authoritative and needs no table. Both are here because they answer
+    different questions — "was this run expensive" and "will next Monday's run
+    happen at all".
+    """
+
+    model: str
+    cache_hit_tokens: int
+    cache_miss_tokens: int
+    completion_tokens: int
+    # Whether DeepSeek's peak multiplier applied, which doubles every rate.
+    peak: bool = False
+    cost_usd: float | None = None
+    # A string, exactly as the API returned it, rather than a float: it is a
+    # money value being displayed and never arithmetic, and parsing it would only
+    # create a way to be wrong.
+    balance_usd: str | None = None
+
+    @property
+    def prompt_tokens(self) -> int:
+        return self.cache_hit_tokens + self.cache_miss_tokens
+
+
+@dataclass(frozen=True)
 class ScanResult:
     """One run's output, before it becomes an email."""
 
@@ -120,3 +148,7 @@ class ScanResult:
     # having a commentary section rather than as an error.
     summary: str = ""
     themes: tuple[str, ...] = ()
+
+    # None when triage did not run. Computed from the API's own usage figures,
+    # never written by the model — the same rule as every other number here.
+    usage: TriageUsage | None = None

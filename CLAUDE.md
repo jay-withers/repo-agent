@@ -152,9 +152,40 @@ terms permit training on inputs, so `llm.PROMPT_FILE_BUDGET` is a privacy
 control as much as a cost one; and only repositories that actually have a
 finding get context in the prompt.
 
-`deepseek-chat` (V3) rather than `deepseek-reasoner` (R1) — ordering a list
-someone else established is not a reasoning problem, and R1's thinking tokens
-bill as output.
+`deepseek-flash` rather than `deepseek-v4-pro` — ordering a list someone else
+established is not a reasoning problem, and the pro model's thinking tokens bill
+as output.
+
+**Not `deepseek-chat`.** That was the first default here and it works, but it
+appears in neither `GET /models` nor the pricing page: it is an undocumented
+alias that resolves to `deepseek-flash`, which the response's own `model` field
+reports. An alias nobody documents can be withdrawn without notice, and this job
+would find out on a Monday. `llm._usage` records the model the API *served*, not
+the one asked for, so a cost is never attributed to the wrong thing.
+
+### Cost and balance in the footer
+
+The digest footer carries `triage <model> · <in> (<cached>) / <out> · ~$<cost> ·
+$<balance> left`. Two different kinds of number, deliberately marked differently:
+
+- **The cost is an estimate**, prefixed `~`, computed from
+  `llm.PRICES_USD_PER_MTOK` — a hand-maintained copy of someone else's price
+  list, checked 2026-09-19. It will go stale silently.
+- **The balance is not**, because it comes from `GET /user/balance`. That is the
+  number to trust, and the reason the extra weekly request is worth making: a
+  job that quietly stops triaging on a 402 is exactly the silent failure this
+  agent exists to catch. Below `LOW_BALANCE_USD` it logs a warning.
+
+Cache hits cost **fifty times less** than misses, so the two are tracked
+separately rather than as one `prompt_tokens`. Where a response omits the
+breakdown everything counts as a miss, which over-estimates.
+
+**Peak rates double everything**, and DeepSeek's peak window is 01:00-04:00 and
+06:00-10:00 UTC on weekdays — so the scan's own `0 7 * * 1` cron sits inside it.
+Moving the schedule an hour later would halve a cost measured in tenths of a
+cent, which is not a reason to move it, but it should not be a surprise either.
+Chinese public holidays are also off-peak and are **not** modelled, so a run on
+one is over-costed.
 
 ## GitHub API
 

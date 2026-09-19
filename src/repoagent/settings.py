@@ -62,10 +62,16 @@ class Settings(BaseSettings):
     # the existing fetch helpers rather than an SDK. Overridable so tests point
     # at a mock host, and so the same code reaches any compatible endpoint.
     deepseek_api_url: str = "https://api.deepseek.com"
-    # `deepseek-chat` (V3) rather than `deepseek-reasoner` (R1): triage is
-    # ordering and summarising a list someone else established, which is not a
-    # reasoning problem, and R1's thinking tokens are billed as output.
-    deepseek_model: str = "deepseek-chat"
+    # `deepseek-flash` rather than `deepseek-v4-pro`: triage is ordering and
+    # summarising a list someone else established, not a reasoning problem, and
+    # the pro model's thinking tokens bill as output.
+    #
+    # Named explicitly rather than as `deepseek-chat`, which this was set to
+    # first. That name is absent from `GET /models` and from the pricing page,
+    # but still resolves — to `deepseek-flash`, as the response's own `model`
+    # field reports. An undocumented alias can be withdrawn without notice, and
+    # this job would find out on a Monday.
+    deepseek_model: str = "deepseek-flash"
 
     # Resend refuses a `from` on an unverified domain, so the default is their
     # shared testing sender — which only delivers to the address that owns the

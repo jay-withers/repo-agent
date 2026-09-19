@@ -143,3 +143,39 @@ def test_digest_carries_the_image_tag(monkeypatch) -> None:
     )
     assert "v0.1.0" in digest.render_text(result)
     assert "v0.1.0" in digest.render_html(result)
+
+
+def test_the_footer_reports_what_triage_cost_and_what_is_left() -> None:
+    """Both numbers computed, neither written by the model."""
+    from repoagent.models import TriageUsage
+
+    result = ScanResult(
+        repos=(),
+        image_tag="v0.1.0",
+        usage=TriageUsage(
+            model="deepseek-flash",
+            cache_hit_tokens=1024,
+            cache_miss_tokens=1653,
+            completion_tokens=186,
+            peak=True,
+            cost_usd=0.000723,
+            balance_usd="9.98",
+        ),
+    )
+
+    footer = digest.triage_footer(result.usage)
+
+    assert "deepseek-flash" in footer
+    # Thousands separators, because a raw 2677 beside a dollar figure reads as money.
+    assert "2,677 in (1,024 cached) / 186 out" in footer
+    # `~` on the estimate, nothing on the balance: one is a hand-maintained price
+    # table, the other is what DeepSeek says.
+    assert "~$0.0007 peak" in footer
+    assert "$9.98 left" in footer
+    assert footer in digest.render_text(result)
+
+
+def test_no_footer_when_triage_did_not_run() -> None:
+    result = ScanResult(repos=(), image_tag="v0.1.0", usage=None)
+
+    assert "triage" not in digest.render_text(result)
