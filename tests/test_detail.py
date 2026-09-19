@@ -28,7 +28,12 @@ def _detail(**overrides: object) -> dict:
         "renovate0": {"text": '{"extends": ["config:recommended"]}'},
         "readme": {"text": "# widget"},
         "dockerfile": None,
-        "workflows": {"entries": [{"name": "ci.yml"}, {"name": "README.md"}]},
+        "workflows": {
+            "entries": [
+                {"name": "ci.yml", "object": {"text": "on: [push]"}},
+                {"name": "README.md", "object": {"text": "not a workflow"}},
+            ]
+        },
         "pullRequests": {"totalCount": 0, "nodes": []},
         "releases": {"nodes": [{"tagName": "v1.2.3", "publishedAt": "2026-09-01T00:00:00Z"}]},
     }
@@ -47,7 +52,8 @@ def test_merge_keeps_only_workflow_files() -> None:
     """`.github/workflows` legitimately holds files Actions ignores."""
     merged = parse.merge_detail(snapshot(), _detail())
 
-    assert merged.workflows == ("ci.yml",)
+    assert merged.workflow_names == ("ci.yml",)
+    assert merged.workflows[0].text == "on: [push]"
 
 
 def test_merge_without_detail_returns_the_snapshot_unchanged() -> None:

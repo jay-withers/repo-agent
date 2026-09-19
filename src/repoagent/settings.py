@@ -73,6 +73,25 @@ class Settings(BaseSettings):
     # this job would find out on a Monday.
     deepseek_model: str = "deepseek-flash"
 
+    # Repositories carrying any of these topics are skipped entirely — not
+    # fetched, not checked, not sent to the model.
+    #
+    # A topic rather than a list of repository names, because `github-repos`
+    # already applies topics from its catalogue, so the exemption is declared
+    # where the rest of a repository's configuration is. `no-scan` is the
+    # explicit marker; `tutorial` is semantic — teaching material genuinely
+    # should not be held to infrastructure standards.
+    #
+    # Comma-separated rather than a list, because this is injected as an
+    # environment variable and pydantic-settings wants JSON for a sequence.
+    ignore_topics: str = "no-scan,tutorial"
+
+    # The repository whose Terraform declares every repository in the estate,
+    # and the file inside it. Empty switches the "unmanaged repository" check
+    # off entirely rather than flagging everything at once.
+    catalogue_repo: str = "jay-withers/github-repos"
+    catalogue_path: str = "terraform/terraform.tfvars"
+
     # Blob container holding the scan's history. Empty switches history off
     # entirely — every finding then reports as new, which is the right default
     # locally and what keeps `make run` working with no storage account.
@@ -94,6 +113,11 @@ class Settings(BaseSettings):
     # send nothing, which is the right default for development.
 
     log_level: str = Field(default="INFO")
+
+    @property
+    def ignored_topics(self) -> frozenset[str]:
+        """`ignore_topics` as a set, blanks and casing handled."""
+        return frozenset(t.strip().lower() for t in self.ignore_topics.split(",") if t.strip())
 
 
 @lru_cache(maxsize=1)

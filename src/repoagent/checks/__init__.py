@@ -17,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from ..models import Finding, RepoSnapshot
-from . import hygiene, renovate
+from . import estate, hygiene, renovate, workflows
 
 Check = Callable[[RepoSnapshot], list[Finding]]
 
@@ -29,6 +29,13 @@ ALL: tuple[Check, ...] = (
     renovate.onboarding_unmerged,
     renovate.stalled_prs,
     renovate.default_config_only,
+    # Estate before hygiene: a repository outside the catalogue has nothing
+    # enforcing anything on it, which outranks every cosmetic finding below.
+    estate.unmanaged,
+    estate.incomplete_terraform_lock,
+    estate.not_shared_preset,
+    workflows.unpinned_actions,
+    workflows.retired_runners,
     hygiene.no_readme,
     hygiene.no_license,
     hygiene.no_description,

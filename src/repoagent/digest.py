@@ -98,6 +98,14 @@ def render_text(result: ScanResult) -> str:
         )
         lines.append("")
 
+    # Named, not just counted: an exemption nobody can see is one nobody
+    # revisits, and a topic added by mistake would otherwise silently drop a
+    # repository out of the digest for ever.
+    if result.ignored:
+        listed = ", ".join(f"{name} ({topic})" for name, topic in result.ignored)
+        lines.append(f"Ignored by topic: {listed}")
+        lines.append("")
+
     lines.append("Repositories:")
     for repo in sorted(result.repos, key=lambda r: r.full_name):
         flags = []
@@ -177,6 +185,11 @@ def render_html(result: ScanResult) -> str:
         )
         resolved_html = f"<h2 style='font-size:16px'>Resolved since last run</h2><ul>{done}</ul>"
 
+    ignored_html = ""
+    if result.ignored:
+        listed = ", ".join(f"{escape(n)} ({escape(t)})" for n, t in result.ignored)
+        ignored_html = f"<p style='color:#888; font-size:12px'>Ignored by topic: {listed}</p>"
+
     suppressed_html = ""
     if result.suppressed_count:
         suppressed_html = (
@@ -213,6 +226,7 @@ def render_html(result: ScanResult) -> str:
         f"{findings_html}"
         f"{resolved_html}"
         f"{suppressed_html}"
+        f"{ignored_html}"
         f"<h2 style='font-size:16px'>Repositories</h2>"
         f"<table style='border-collapse:collapse'>{''.join(rows)}</table>"
         f"<p style='color:#888; font-size:12px'>repo-agent {escape(result.image_tag)}"

@@ -152,6 +152,77 @@ to a value pasted with curly quotes, which are invisible in
 `az keyvault secret show` output. Read the codepoints (`| cat -A`) when a send
 fails on the address.
 
+## Exempting a repository
+
+**A repository carrying any topic in `ignore_topics` is skipped entirely** — not
+fetched, not checked, not sent to the model. Default: `no-scan,tutorial`.
+
+A topic rather than a list of repository names or a state entry, because
+`github-repos` already applies topics from its catalogue, so the exemption is
+declared where the rest of a repository's configuration lives. `no-scan` is the
+explicit marker for anything; `tutorial` is semantic — teaching material
+genuinely should not be held to infrastructure standards.
+
+`git-demo` is the case this exists for, and its catalogue entry already said so
+in a comment: *"it will show up in repo-agent's digest as missing both —
+expected, not a defect"*. It carries `tutorial`, so it now drops out with no
+change to either repository.
+
+**Exempt repositories are named in the digest, not merely counted.** An
+exemption nobody can see is one nobody revisits, and a topic added by mistake
+would otherwise silently drop a repository out of the digest for ever.
+
+## Security scanning: considered, not built
+
+Reading **Dependabot, secret scanning and code scanning alerts** was designed and
+deliberately not built. Surveyed across the estate first: all 13 repositories
+already run gitleaks in pre-commit, every Terraform repository runs Checkov, and
+12 of 13 run pre-commit in CI *and* have `pre-commit / Pre-commit` as a required
+check. A "is a scanner configured" check would have been silent from the day it
+shipped, and the alert APIs need three new App permissions plus a re-approved
+installation.
+
+**The residual gap, recorded rather than argued:** gitleaks in pre-commit is a
+*local* control. It runs only for people who have run `pre-commit install`, and
+`--no-verify` skips it — so a secret pushed from a fresh clone, from CI, or by
+someone who skipped the hook never meets it. GitHub secret scanning is the
+backstop for exactly that case, and nothing readable from a config file says
+whether it has ever fired. Revisit if a credential ever does leak, or if the
+estate stops being uniform.
+
+## Checking an estate that is already declared
+
+`jay-withers/github-repos` holds a catalogue of every repository and applies
+branch protection, required checks, description and topics from it. So a check
+asking "does this repo have branch protection" would mostly re-report that
+repo's own Terraform. **The useful inversion is coverage** — `estate.unmanaged`
+asks what exists on GitHub that the catalogue does not declare, because nothing
+is enforcing anything on those.
+
+`in_catalogue` is a **tri-state**. `None` means the catalogue could not be read
+and must never render as "every repository is unmanaged", which is what a plain
+boolean produces the first time the file moves. `catalogue_repo` empty switches
+the check off entirely for the same reason.
+
+`parse_catalogue` is a brace-depth scan, not a regex over the whole file: the
+values contain nested blocks (`required_status_checks = [{ context = ... }]`)
+and any pattern loose enough to find the repository keys also finds those. It is
+deliberately not a real HCL parser — that would be a dependency for one check.
+
+**A `.terraform.lock.hcl` never names a platform.** The first version of
+`estate.incomplete_terraform_lock` searched for the literal `linux_amd64` and
+consequently reported every Terraform repository in the estate, including this
+one, whose lock is correct. Platform coverage is the **count of `h1:` hashes per
+provider block** — one per platform locked — and `zh:` entries are the
+registry's zip hashes, present regardless, so counting those proves nothing.
+`test_platform_names_are_never_looked_for_in_a_lock_file` pins this.
+
+Workflow **contents** are fetched, not just filenames, because whether an action
+is pinned to a commit and which runner a job asks for are answered by the text
+and nothing else. They are deliberately **not** sent to the triage prompt —
+`llm._user_prompt` sends `workflow_names` — since a dozen workflow files per
+repository would dominate it.
+
 ## The checks, and what the model is allowed to do
 
 **Checks are pure `(RepoSnapshot) -> list[Finding]` functions in `checks/`, and

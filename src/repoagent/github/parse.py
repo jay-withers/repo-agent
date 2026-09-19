@@ -10,7 +10,7 @@ from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
-from ..models import PullRequest, RepoSnapshot
+from ..models import PullRequest, RepoSnapshot, Workflow
 
 
 def repo_snapshot(raw: dict[str, Any]) -> RepoSnapshot:
@@ -82,12 +82,15 @@ def merge_detail(snapshot: RepoSnapshot, detail: dict[str, Any] | None) -> RepoS
         dockerfile=_blob_text(detail.get("dockerfile")),
         has_readme=_blob_text(detail.get("readme")) is not None,
         workflows=tuple(
-            entry.get("name", "")
+            Workflow(name=entry.get("name", ""), text=_blob_text(entry.get("object")) or "")
             for entry in (workflows.get("entries") or [])
             # A Tree lists directories too, and `.github/workflows` legitimately
             # contains non-workflow files that GitHub Actions ignores.
             if entry.get("name", "").endswith((".yml", ".yaml"))
         ),
+        # `terraform/` first, which is this estate's layout; the root is the
+        # fallback for a repository that is itself a module.
+        terraform_lock=_blob_text(detail.get("tflock")) or _blob_text(detail.get("tflock_root")),
         open_prs=tuple(pull_request(raw) for raw in prs),
         last_release=release.get("tagName"),
         last_release_at=_timestamp(release.get("publishedAt")),
