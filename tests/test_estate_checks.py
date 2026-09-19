@@ -5,6 +5,7 @@ from __future__ import annotations
 from repoagent.checks import estate, workflows
 from repoagent.github.client import parse_catalogue
 from tests.factories import HEALTHY_TF_LOCK, snapshot, workflow
+from tests.helpers import route_client
 
 # The real catalogue's shape: quoted keys inside `repos = { ... }`, values
 # containing nested blocks that a looser pattern would also match.
@@ -212,3 +213,79 @@ def test_ubuntu_latest_is_not_a_finding() -> None:
     text = "    runs-on: ubuntu-latest\n"
 
     assert workflows.retired_runners(snapshot(workflows=(workflow(text=text),))) == []
+
+
+# --- ignored repositories ---------------------------------------------------
+
+
+def test_a_repository_with_an_ignored_topic_is_dropped_before_anything_else() -> None:
+    """Not fetched, not checked, not sent to the model."""
+    import httpx
+
+    from repoagent.jobs import scan
+
+    repos = {
+        "total_count": 2,
+        "repositories": [
+            {
+                "name": "git-demo",
+                "full_name": "jay-withers/git-demo",
+                "description": None,
+                "default_branch": "main",
+                "archived": False,
+                "pushed_at": "2026-09-01T00:00:00Z",
+                "topics": ["git", "learning", "tutorial"],
+                "license": None,
+                "html_url": "https://github.com/jay-withers/git-demo",
+            },
+            {
+                "name": "repo-agent",
+                "full_name": "jay-withers/repo-agent",
+                "description": "d",
+                "default_branch": "main",
+                "archived": False,
+                "pushed_at": "2026-09-01T00:00:00Z",
+                "topics": ["azure"],
+                "license": {"key": "mit"},
+                "html_url": "https://github.com/jay-withers/repo-agent",
+            },
+        ],
+    }
+    calls: list[httpx.Request] = []
+    client = route_client(
+        {
+            "/app/installations/1/access_tokens": httpx.Response(
+                201, json={"token": "ghs_x", "expires_at": "2099-01-01T00:00:00Z"}
+            ),
+            "/app/installations": httpx.Response(200, json=[{"id": 1}]),
+            "/installation/repositories": httpx.Response(200, json=repos),
+            "/graphql": httpx.Response(200, json={"data": {}}),
+        },
+        calls=calls,
+    )
+
+    result = scan.run(send_email=False, http=client)
+
+    assert result.ignored == (("jay-withers/git-demo", "tutorial"),)
+    assert [r.full_name for r in result.repos] == ["jay-withers/repo-agent"]
+    assert not any(f.repo == "jay-withers/git-demo" for f in result.findings)
+    # The detail query never asked about it.
+    graphql = [c for c in calls if "graphql" in str(c.url)]
+    assert not any(b"git-demo" in c.content for c in graphql)
+
+
+def test_ignored_repositories_are_named_in_the_digest() -> None:
+    """An exemption nobody can see is one nobody revisits."""
+    from repoagent import digest
+    from repoagent.models import ScanResult
+
+    result = ScanResult(repos=(), ignored=(("jay-withers/git-demo", "tutorial"),))
+
+    assert "Ignored by topic: jay-withers/git-demo (tutorial)" in digest.render_text(result)
+
+
+def test_topic_matching_ignores_case() -> None:
+    from repoagent.settings import settings
+
+    assert "tutorial" in settings().ignored_topics
+    assert "no-scan" in settings().ignored_topics

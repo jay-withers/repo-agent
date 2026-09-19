@@ -74,6 +74,13 @@ catch elsewhere.
 Archived repositories are skipped wholesale: every finding would be true,
 unactionable and permanent, which is how you train someone to ignore an email.
 
+**A repository carrying any topic in `ignore_topics` (default `no-scan`,
+`tutorial`) is skipped entirely** — not fetched, not checked, not sent to the
+model. Topics are applied by `github-repos` from its catalogue, so the exemption
+is declared alongside the rest of a repository's configuration rather than
+hidden in this agent's own state. Exempt repositories are named in the digest,
+so an exemption added by mistake does not silently persist.
+
 The estate checks are the ones worth having here specifically. This estate is
 *declared* — `jay-withers/github-repos` holds a catalogue of every repository
 and applies branch protection and required checks from it — so asking "does this

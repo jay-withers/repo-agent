@@ -37,6 +37,7 @@ from .. import checks, digest, llm, mailer, state
 from ..github import client as github_client
 from ..github import parse
 from ..models import Finding, RepoSnapshot, ScanResult
+from ..settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ def run(*, send_email: bool = True, http: httpx.Client | None = None) -> ScanRes
     owned = http is None
     session = http or httpx.Client(timeout=30.0)
     try:
-        repos = _snapshots(session)
+        repos, ignored = _snapshots(session)
         found = _findings(repos)
 
         against = state.load()
@@ -82,6 +83,7 @@ def run(*, send_email: bool = True, http: httpx.Client | None = None) -> ScanRes
             summary=summary,
             themes=themes,
             usage=usage,
+            ignored=ignored,
             resolved=tuple((k.repo, k.title) for k in reconciled.resolved),
             suppressed_count=len(reconciled.suppressed),
         )
@@ -119,8 +121,10 @@ def run(*, send_email: bool = True, http: httpx.Client | None = None) -> ScanRes
             session.close()
 
 
-def _snapshots(session: httpx.Client) -> tuple[RepoSnapshot, ...]:
-    """Every repository, with its GraphQL detail folded in where available.
+def _snapshots(
+    session: httpx.Client,
+) -> tuple[tuple[RepoSnapshot, ...], tuple[tuple[str, str], ...]]:
+    """Every repository worth checking, plus the ones deliberately skipped.
 
     The detail query is allowed to fail. Its absence costs the Renovate checks
     their input — they report nothing rather than something wrong, since a
@@ -128,7 +132,26 @@ def _snapshots(session: httpx.Client) -> tuple[RepoSnapshot, ...]:
     indistinguishable from one that genuinely has no config.
     """
     raw_repos = github_client.installation_repos(client=session)
-    repos = [parse.repo_snapshot(raw) for raw in raw_repos]
+    everything = [parse.repo_snapshot(raw) for raw in raw_repos]
+
+    # Dropped before anything else, so an exempt repository costs no GraphQL
+    # node budget and contributes nothing to the triage prompt.
+    exempt = settings().ignored_topics
+    ignored: list[tuple[str, str]] = []
+    repos: list[RepoSnapshot] = []
+    for repo in everything:
+        matched = next((t for t in repo.topics if t.lower() in exempt), None)
+        if matched:
+            ignored.append((repo.full_name, matched))
+        else:
+            repos.append(repo)
+    if ignored:
+        logger.info(
+            "ignoring %d repositor%s by topic: %s",
+            len(ignored),
+            "y" if len(ignored) == 1 else "ies",
+            ", ".join(f"{name} ({topic})" for name, topic in ignored),
+        )
 
     # Archived repositories are skipped by `checks.run_all` anyway, so fetching
     # their detail is tokens and rate limit spent on findings nobody will see.
@@ -141,19 +164,20 @@ def _snapshots(session: httpx.Client) -> tuple[RepoSnapshot, ...]:
         details = github_client.repo_details(wanted, client=session)
     except Exception as exc:
         logger.warning("detail query failed, continuing without it: %s", exc)
-        return tuple(repos)
+        return tuple(repos), tuple(ignored)
 
     # None when unreadable, which `estate.unmanaged` treats as "do not judge" —
     # a moved catalogue file must not report the whole estate as unmanaged.
     declared = github_client.catalogue(client=session)
 
-    return tuple(
+    merged = tuple(
         replace(
             parse.merge_detail(repo, details.get(repo.full_name)),
             in_catalogue=None if declared is None else repo.name in declared,
         )
         for repo in repos
     )
+    return merged, tuple(ignored)
 
 
 def _findings(repos: tuple[RepoSnapshot, ...]) -> list[Finding]:

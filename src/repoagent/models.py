@@ -187,6 +187,10 @@ class ScanResult:
     # `(repo, title)` because by definition there is no longer a Finding to
     # point at.
     resolved: tuple[tuple[str, str], ...] = ()
+    # Repositories skipped entirely, as `(full_name, topic that matched)`.
+    # Named rather than merely counted: an exemption nobody can see is one
+    # nobody revisits, and a topic added by mistake would otherwise be silent.
+    ignored: tuple[tuple[str, str], ...] = ()
     # How many findings a suppression held back, so the digest can say so
     # without listing them. A suppression nobody can see is one nobody revisits.
     suppressed_count: int = 0
