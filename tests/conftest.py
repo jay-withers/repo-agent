@@ -5,13 +5,22 @@ The important parts are unchanged and worth restating:
 
 - Every secret is set as an environment variable, so `secret()` resolves from
   the environment and never reaches for a vault.
-- **`KEY_VAULT_URI` is deleted**, so a secret this file forgot fails loudly
-  rather than falling through to a real Key Vault call.
-- All three `lru_cache`s are cleared around every test, because `secret()` and
-  `settings()` would otherwise leak one test's values into the next.
+- **Tests run in an empty temporary directory**, so the developer's own `.env`
+  cannot reach them. Both `Settings` and `secret()` resolve `.env` relative to
+  the working directory, and deleting an environment variable does *not* stop
+  either from reading the file — which quietly defeated the guarantee below for
+  anyone who had one.
+- **`KEY_VAULT_URI` is set empty rather than deleted**, so a secret this file
+  forgot fails loudly rather than falling through to a real Key Vault call. An
+  explicit empty value beats a `.env`; an absent one does not.
+- All four `lru_cache`s are cleared around every test, because `secret()`,
+  `settings()` and `dotenv()` would otherwise leak one test's values into the
+  next.
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import pytest
 
@@ -39,7 +48,10 @@ def rsa_private_key() -> str:
 
 
 @pytest.fixture(autouse=True)
-def fake_secrets(monkeypatch: pytest.MonkeyPatch, rsa_private_key: str) -> None:
+def fake_secrets(monkeypatch: pytest.MonkeyPatch, rsa_private_key: str, tmp_path: Path) -> None:
+    # First, before anything reads a setting: somewhere with no `.env` in it.
+    monkeypatch.chdir(tmp_path)
+
     monkeypatch.setenv("GITHUB_APP_ID", "123456")
     monkeypatch.setenv("GITHUB_APP_PRIVATE_KEY", rsa_private_key)
     monkeypatch.setenv("RESEND_API_KEY", "re_test")
@@ -47,7 +59,7 @@ def fake_secrets(monkeypatch: pytest.MonkeyPatch, rsa_private_key: str) -> None:
     # Absent by default, so triage is off unless a test switches it on. A test
     # that accidentally enabled it would reach api.deepseek.com for real.
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
-    monkeypatch.delenv("KEY_VAULT_URI", raising=False)
+    monkeypatch.setenv("KEY_VAULT_URI", "")
     monkeypatch.delenv("APPLICATIONINSIGHTS_CONNECTION_STRING", raising=False)
     monkeypatch.delenv("IMAGE_TAG", raising=False)
 
@@ -63,6 +75,7 @@ def no_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _clear_caches() -> None:
+    settings_module.dotenv.cache_clear()
     settings_module.settings.cache_clear()
     settings_module.secret.cache_clear()
     settings_module.optional_secret.cache_clear()
