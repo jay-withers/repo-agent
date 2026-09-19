@@ -102,6 +102,13 @@ reply is validated against a schema, invented finding ids are dropped, and any
 finding the model omits is appended in its original order. The set that goes in
 is the set that comes out.
 
+**Suggestions are the one place the model speaks for itself**, and they are kept
+apart at every level — their own field, their own section, excluded from every
+total and from the subject line, and never written to the state document. A
+suggestion can never become something the scanner remembers having checked.
+Coded checks only cover what someone thought to write; this covers the rest,
+labelled as opinion.
+
 That rule is not paranoia. market-agent's summary job, given a reconciliation
 count and no trades table, accurately reported from what it had been given that
 nothing had happened on a day three trades executed. The defence is not a better

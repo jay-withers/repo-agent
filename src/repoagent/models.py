@@ -166,6 +166,39 @@ class TriageUsage:
 
 
 @dataclass(frozen=True)
+class Suggestion:
+    """Something the model thinks is worth doing. **Not a finding.**
+
+    Findings are established by pure functions anyone can read; a suggestion is
+    the model's opinion. They are kept in separate fields, rendered in separate
+    sections, counted in neither the totals nor the subject line, and never
+    written to the state document — so nothing about a suggestion can ever be
+    mistaken for something the scanner checked.
+    """
+
+    text: str
+    # Empty for a suggestion about the estate rather than one repository.
+    repo: str = ""
+
+
+@dataclass(frozen=True)
+class TriageOutcome:
+    """Everything the triage step produced.
+
+    A dataclass rather than the tuple this used to return: it had reached four
+    elements and adding suggestions would have made five, which is the point at
+    which positional unpacking stops being readable and starts being a bug
+    waiting for someone to reorder it.
+    """
+
+    findings: tuple[Finding, ...] = ()
+    summary: str = ""
+    themes: tuple[str, ...] = ()
+    usage: TriageUsage | None = None
+    suggestions: tuple[Suggestion, ...] = ()
+
+
+@dataclass(frozen=True)
 class ScanResult:
     """One run's output, before it becomes an email."""
 
@@ -187,6 +220,9 @@ class ScanResult:
     # `(repo, title)` because by definition there is no longer a Finding to
     # point at.
     resolved: tuple[tuple[str, str], ...] = ()
+    # The model's opinions, kept apart from `findings` at every level. Never
+    # counted, never in the subject line, never persisted.
+    suggestions: tuple[Suggestion, ...] = ()
     # Repositories skipped entirely, as `(full_name, topic that matched)`.
     # Named rather than merely counted: an exemption nobody can see is one
     # nobody revisits, and a topic added by mistake would otherwise be silent.

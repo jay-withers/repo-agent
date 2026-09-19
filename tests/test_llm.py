@@ -14,7 +14,7 @@ import pytest
 
 from repoagent import llm
 from repoagent import settings as settings_module
-from repoagent.models import Finding
+from repoagent.models import Finding, TriageOutcome
 from tests.factories import snapshot
 from tests.helpers import json_client, mock_client, route_client
 
@@ -65,18 +65,18 @@ def _reply(body: dict) -> dict:
 
 def test_no_api_key_passes_findings_through_untouched() -> None:
     """What makes `repoagent render` work on a laptop with no DeepSeek account."""
-    findings, summary, themes, _ = llm.triage(list(_FINDINGS), _REPOS)
+    out = llm.triage(list(_FINDINGS), _REPOS)
 
-    assert list(findings) == _FINDINGS
-    assert summary == ""
-    assert themes == ()
+    assert list(out.findings) == _FINDINGS
+    assert out.summary == ""
+    assert out.themes == ()
 
 
 def test_no_findings_makes_no_call(api_key: None) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise AssertionError(f"unexpected request to {request.url}")
 
-    assert llm.triage([], _REPOS, client=mock_client(handler)) == ((), "", (), None)
+    assert llm.triage([], _REPOS, client=mock_client(handler)) == TriageOutcome()
 
 
 def test_the_model_reorders_the_findings(api_key: None) -> None:
@@ -87,20 +87,20 @@ def test_the_model_reorders_the_findings(api_key: None) -> None:
         )
     )
 
-    findings, summary, themes, _ = llm.triage(list(_FINDINGS), _REPOS, client=client)
+    out = llm.triage(list(_FINDINGS), _REPOS, client=client)
 
-    assert [f.id for f in findings] == [ids[2], ids[0], ids[1]]
-    assert summary == "Fix a first."
-    assert themes == ("renovate",)
+    assert [f.id for f in out.findings] == [ids[2], ids[0], ids[1]]
+    assert out.summary == "Fix a first."
+    assert out.themes == ("renovate",)
 
 
 def test_invented_finding_ids_are_dropped(api_key: None) -> None:
     ids = [f.id for f in _FINDINGS]
     client = json_client(_reply({"summary": "", "order": ["deadbeefcafe", *ids], "themes": []}))
 
-    findings, _, _, _ = llm.triage(list(_FINDINGS), _REPOS, client=client)
+    out = llm.triage(list(_FINDINGS), _REPOS, client=client)
 
-    assert [f.id for f in findings] == ids
+    assert [f.id for f in out.findings] == ids
 
 
 def test_findings_the_model_omits_are_appended_not_lost(api_key: None) -> None:
@@ -108,9 +108,9 @@ def test_findings_the_model_omits_are_appended_not_lost(api_key: None) -> None:
     ids = [f.id for f in _FINDINGS]
     client = json_client(_reply({"summary": "", "order": [ids[1]], "themes": []}))
 
-    findings, _, _, _ = llm.triage(list(_FINDINGS), _REPOS, client=client)
+    out = llm.triage(list(_FINDINGS), _REPOS, client=client)
 
-    assert [f.id for f in findings] == [ids[1], ids[0], ids[2]]
+    assert [f.id for f in out.findings] == [ids[1], ids[0], ids[2]]
 
 
 def test_a_duplicated_id_is_only_rendered_once(api_key: None) -> None:
@@ -119,34 +119,34 @@ def test_a_duplicated_id_is_only_rendered_once(api_key: None) -> None:
         _reply({"summary": "", "order": [ids[0], ids[0], ids[1], ids[2]], "themes": []})
     )
 
-    findings, _, _, _ = llm.triage(list(_FINDINGS), _REPOS, client=client)
+    out = llm.triage(list(_FINDINGS), _REPOS, client=client)
 
-    assert [f.id for f in findings] == ids
+    assert [f.id for f in out.findings] == ids
 
 
 def test_a_failed_call_costs_the_commentary_not_the_digest(api_key: None) -> None:
     client = json_client({"error": "insufficient balance"}, status=402)
 
-    findings, summary, _, _ = llm.triage(list(_FINDINGS), _REPOS, client=client)
+    out = llm.triage(list(_FINDINGS), _REPOS, client=client)
 
-    assert list(findings) == _FINDINGS
-    assert summary == ""
+    assert list(out.findings) == _FINDINGS
+    assert out.summary == ""
 
 
 def test_a_reply_that_is_not_json_costs_the_commentary_not_the_digest(api_key: None) -> None:
     client = json_client({"choices": [{"message": {"content": "Sure! Here you go:"}}]})
 
-    findings, summary, _, _ = llm.triage(list(_FINDINGS), _REPOS, client=client)
+    out = llm.triage(list(_FINDINGS), _REPOS, client=client)
 
-    assert list(findings) == _FINDINGS
-    assert summary == ""
+    assert list(out.findings) == _FINDINGS
+    assert out.summary == ""
 
 
 def test_a_reply_missing_the_choices_key_is_survivable(api_key: None) -> None:
-    findings, summary, _, _ = llm.triage(list(_FINDINGS), _REPOS, client=json_client({}))
+    out = llm.triage(list(_FINDINGS), _REPOS, client=json_client({}))
 
-    assert list(findings) == _FINDINGS
-    assert summary == ""
+    assert list(out.findings) == _FINDINGS
+    assert out.summary == ""
 
 
 def test_the_prompt_carries_only_repositories_that_have_a_finding(api_key: None) -> None:
@@ -237,15 +237,15 @@ def _priced_client(reply: dict, balance: dict | None = _BALANCE) -> httpx.Client
 
 
 def test_usage_is_reported_from_the_api_not_estimated(api_key: None) -> None:
-    _, _, _, usage = llm.triage(
+    out = llm.triage(
         list(_FINDINGS), _REPOS, client=_priced_client(_usage_reply(hit=1000, miss=2000, out=150))
     )
 
-    assert usage is not None
-    assert usage.cache_hit_tokens == 1000
-    assert usage.cache_miss_tokens == 2000
-    assert usage.prompt_tokens == 3000
-    assert usage.completion_tokens == 150
+    assert out.usage is not None
+    assert out.usage.cache_hit_tokens == 1000
+    assert out.usage.cache_miss_tokens == 2000
+    assert out.usage.prompt_tokens == 3000
+    assert out.usage.completion_tokens == 150
 
 
 def test_cost_prices_cache_hits_far_below_misses(api_key: None) -> None:
@@ -295,12 +295,10 @@ def test_missing_cache_fields_are_counted_as_misses(api_key: None) -> None:
 
 
 def test_the_balance_is_attached_from_the_api(api_key: None) -> None:
-    _, _, _, usage = llm.triage(
-        list(_FINDINGS), _REPOS, client=_priced_client(_usage_reply(10, 20, 5))
-    )
+    out = llm.triage(list(_FINDINGS), _REPOS, client=_priced_client(_usage_reply(10, 20, 5)))
 
-    assert usage is not None
-    assert usage.balance_usd == "9.98"
+    assert out.usage is not None
+    assert out.usage.balance_usd == "9.98"
 
 
 def test_a_failed_balance_lookup_costs_only_the_balance(api_key: None) -> None:
@@ -311,32 +309,132 @@ def test_a_failed_balance_lookup_costs_only_the_balance(api_key: None) -> None:
         }
     )
 
-    _, _, _, usage = llm.triage(list(_FINDINGS), _REPOS, client=client)
+    out = llm.triage(list(_FINDINGS), _REPOS, client=client)
 
-    assert usage is not None
-    assert usage.balance_usd is None
-    assert usage.cache_miss_tokens == 20
+    assert out.usage is not None
+    assert out.usage.balance_usd is None
+    assert out.usage.cache_miss_tokens == 20
 
 
 def test_a_non_usd_balance_is_ignored(api_key: None) -> None:
     """The price table is in USD; a CNY figure beside it would mislead."""
     cny = {"is_available": True, "balance_infos": [{"currency": "CNY", "total_balance": "70.00"}]}
 
-    _, _, _, usage = llm.triage(
+    out = llm.triage(
         list(_FINDINGS), _REPOS, client=_priced_client(_usage_reply(10, 20, 5), balance=cny)
     )
 
-    assert usage is not None
-    assert usage.balance_usd is None
+    assert out.usage is not None
+    assert out.usage.balance_usd is None
 
 
 def test_the_model_recorded_is_the_one_the_api_served(api_key: None) -> None:
     """`deepseek-chat` resolves to something else, and a cost on the wrong model misleads."""
-    _, _, _, usage = llm.triage(
+    out = llm.triage(
         list(_FINDINGS),
         _REPOS,
         client=_priced_client(_usage_reply(10, 20, 5, model="deepseek-flash")),
     )
 
-    assert usage is not None
-    assert usage.model == "deepseek-flash"
+    assert out.usage is not None
+    assert out.usage.model == "deepseek-flash"
+
+
+# --- suggestions ------------------------------------------------------------
+
+
+def _with_suggestions(*suggestions: dict) -> dict:
+    return {
+        "model": "deepseek-flash",
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {"summary": "", "order": [], "themes": [], "suggestions": list(suggestions)}
+                    )
+                }
+            }
+        ],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+    }
+
+
+def test_suggestions_are_returned_separately_from_findings(api_key: None) -> None:
+    client = _priced_client(
+        _with_suggestions(
+            {
+                "repo": "jay-withers/a",
+                "text": "The Dockerfile installs build tools into the runtime stage.",
+            }
+        )
+    )
+
+    out = llm.triage(list(_FINDINGS), _REPOS, client=client)
+
+    assert len(out.suggestions) == 1
+    assert out.suggestions[0].repo == "jay-withers/a"
+    # And the findings are untouched by them.
+    assert list(out.findings) == _FINDINGS
+
+
+def test_a_suggestion_about_an_invented_repository_is_dropped(api_key: None) -> None:
+    """The same defence as invented finding ids."""
+    client = _priced_client(
+        _with_suggestions(
+            {"repo": "jay-withers/does-not-exist", "text": "x"},
+            {"repo": "jay-withers/a", "text": "y"},
+        )
+    )
+
+    out = llm.triage(list(_FINDINGS), _REPOS, client=client)
+
+    assert [s.repo for s in out.suggestions] == ["jay-withers/a"]
+
+
+def test_an_estate_wide_suggestion_carries_no_repository(api_key: None) -> None:
+    client = _priced_client(_with_suggestions({"repo": "", "text": "Adopt a shared Dockerfile."}))
+
+    out = llm.triage(list(_FINDINGS), _REPOS, client=client)
+
+    assert out.suggestions[0].repo == ""
+
+
+def test_suggestions_are_capped(api_key: None) -> None:
+    """A wall of opinion would bury the findings above it."""
+    many = [{"repo": "", "text": f"idea {n}"} for n in range(20)]
+    client = _priced_client(_with_suggestions(*many))
+
+    out = llm.triage(list(_FINDINGS), _REPOS, client=client)
+
+    assert len(out.suggestions) == llm.MAX_SUGGESTIONS
+
+
+def test_empty_suggestions_are_discarded(api_key: None) -> None:
+    client = _priced_client(_with_suggestions({"repo": "", "text": "   "}))
+
+    assert llm.triage(list(_FINDINGS), _REPOS, client=client).suggestions == ()
+
+
+def test_a_reply_with_no_suggestions_key_is_fine(api_key: None) -> None:
+    """An older or terser reply must not fail the whole triage."""
+    out = llm.triage(list(_FINDINGS), _REPOS, client=_priced_client(_usage_reply(10, 20, 5)))
+
+    assert out.suggestions == ()
+
+
+def test_a_truncated_reply_says_so_rather_than_failing_to_parse(api_key: None, caplog) -> None:
+    """Reasoning tokens count against max_tokens and are invisible in the reply.
+
+    Without this, hitting the cap surfaces as "1 validation error for Triage"
+    about a missing brace, which says nothing about the real cause.
+    """
+    truncated = {
+        "model": "deepseek-flash",
+        "choices": [{"finish_reason": "length", "message": {"content": '{"summary": "half a sen'}}],
+        "usage": {"prompt_tokens": 10, "completion_tokens": llm.MAX_OUTPUT_TOKENS},
+    }
+
+    out = llm.triage(list(_FINDINGS), _REPOS, client=_priced_client(truncated))
+
+    assert list(out.findings) == _FINDINGS
+    assert "truncated" in caplog.text

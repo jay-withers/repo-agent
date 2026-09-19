@@ -72,17 +72,19 @@ def run(*, send_email: bool = True, http: httpx.Client | None = None) -> ScanRes
             len(reconciled.suppressed),
         )
 
-        ordered, summary, themes, usage = llm.triage(
-            list(reconciled.findings), repos, client=session
-        )
+        triaged = llm.triage(list(reconciled.findings), repos, client=session)
 
         result = ScanResult(
             repos=repos,
-            findings=ordered,
+            findings=triaged.findings,
             image_tag=os.environ.get("IMAGE_TAG", "unknown"),
-            summary=summary,
-            themes=themes,
-            usage=usage,
+            summary=triaged.summary,
+            themes=triaged.themes,
+            usage=triaged.usage,
+            # Deliberately not folded into `findings`, and deliberately not
+            # passed to `state`: a suggestion is an opinion, and nothing about it
+            # should ever be mistaken for something the scanner checked.
+            suggestions=triaged.suggestions,
             ignored=ignored,
             resolved=tuple((k.repo, k.title) for k in reconciled.resolved),
             suppressed_count=len(reconciled.suppressed),
@@ -107,7 +109,7 @@ def run(*, send_email: bool = True, http: httpx.Client | None = None) -> ScanRes
         logger.info(
             "scanned %d repositories, %d finding(s), email %s",
             len(repos),
-            len(ordered),
+            len(triaged.findings),
             outcome.status,
         )
 
