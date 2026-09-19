@@ -22,10 +22,37 @@ once, on a dependency PR nobody reads closely.
 
 ## Status
 
-**Walking skeleton.** It authenticates, lists every repository and emails a
-digest of what it found. The checks themselves are not written yet: `scan.run()`
-already returns a `findings` tuple and the digest already renders one, so they
-land without changing the shape of anything.
+**Working.** Four stages, and the order of the middle two is the design:
+
+1. **Fetch** — the REST installation list, then one batched GraphQL query for
+   the Renovate config, README, Dockerfile, workflow names, open pull requests
+   and latest release of each repository.
+2. **Check** — nine pure functions turn each snapshot into findings. Everything
+   the digest reports as fact is established here.
+3. **Triage** — DeepSeek orders those findings and writes a short paragraph of
+   context. It cannot add, remove or alter one.
+4. **Report** — rendered and emailed.
+
+Stage 3 is the only one that can be skipped. No `DEEPSEEK-API-KEY`, or a failed
+call, and the digest goes out with its findings in severity order and no
+commentary.
+
+### What it checks
+
+| Check | Severity | What it means |
+|---|---|---|
+| `renovate.missing_config` | high | No config at any path Renovate reads |
+| `renovate.onboarding_unmerged` | high | Onboarding PR never merged, so Renovate opens nothing |
+| `renovate.stalled_prs` | medium/high | Updates not being merged, or a backlog nearing `prConcurrentLimit` |
+| `renovate.pinned_to_nothing` | low | Generated config nobody ever added a policy to |
+| `hygiene.no_ci` | high/low | No workflows — high when Renovate is configured, since updates merge on faith |
+| `hygiene.no_readme` | medium | No README at the root |
+| `hygiene.no_license` | medium | Public repository with no detectable licence |
+| `hygiene.no_description` | low | Unidentifiable in a list |
+| `hygiene.stale` | low | No pushes in six months |
+
+Archived repositories are skipped wholesale: every finding would be true,
+unactionable and permanent, which is how you train someone to ignore an email.
 
 ## Design
 
@@ -36,16 +63,34 @@ whole fleet ("which three of these thirty matter this week"), and even then
 every *figure* in the email is computed. The model gets to write commentary and
 an ordering, and is told the tables are already above its text.
 
+Three things enforce that structurally rather than trusting the prompt: the
+reply is validated against a schema, invented finding ids are dropped, and any
+finding the model omits is appended in its original order. The set that goes in
+is the set that comes out.
+
 That rule is not paranoia. market-agent's summary job, given a reconciliation
 count and no trades table, accurately reported from what it had been given that
 nothing had happened on a day three trades executed. The defence is not a better
 prompt — it is never letting the model near a number that gets reported.
 
-**Stateless, weekly.** There is no database. Every finding carries an `age_days`
-derived from a GitHub timestamp the agent did not invent, so a digest can split
-"new this week" from "open for 21 days" out of a single scan. A repeat finding
-that says how long it has been true is more useful than silence, and fixing
-something makes it disappear next Monday.
+**Stateless, weekly — for now.** There is no database. Every finding carries an
+`age_days` derived from a GitHub timestamp the agent did not invent, so a digest
+can split "new this week" from "open for 21 days" out of a single scan, and
+fixing something makes it disappear next Monday.
+
+The limit of that is real: a finding with no GitHub timestamp behind it — a
+missing LICENSE has always been missing — has no age at all, and the digest
+cannot say what changed since last week. `Finding.id` is a stable hash of
+`repo:check` precisely so a `{finding_id: first_seen}` map can be added later
+without reworking anything.
+
+**LLM triage is optional and off by default.** `DEEPSEEK-API-KEY` is read with
+`optional_secret()`, so its absence switches the step off instead of failing the
+run. Worth knowing what setting it switches on: repository names, the findings,
+and truncated Renovate config, README and Dockerfile text are sent to DeepSeek,
+which is China-hosted and whose terms permit training on inputs. Only
+repositories that actually have a finding are described in the prompt, and each
+file is clipped hard before it goes — a cost control and a privacy one.
 
 **No search API, ever.** GitHub's search endpoints have a far tighter secondary
 rate limit than the core API, and they signal it with **403, not 429**. Four
@@ -163,7 +208,11 @@ The platform must exist first, and the image must exist before the job that
 pulls it:
 
 1. Apply `azure-container-apps` (dev).
-2. Create the GitHub App and install it.
+2. Create the GitHub App **and install it** — two separate actions, and the
+   second is easy to miss. Needs `Metadata`, `Contents` and `Pull requests`,
+   all read-only, and **All repositories** so a new repo is covered with no
+   config change. Changing permissions on an existing installation raises a
+   request that has to be accepted before it takes effect.
 3. Merge to `main` here — `cd-tag` mints a version, `cd-publish` pushes the image.
 4. **Check the GHCR package is public** — the job has no pull secret, so a
    private package fails the pull. On the first release here it was already
