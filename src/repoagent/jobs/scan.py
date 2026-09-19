@@ -49,7 +49,7 @@ def run(*, send_email: bool = True, http: httpx.Client | None = None) -> ScanRes
     try:
         repos = _snapshots(session)
         findings = _findings(repos)
-        ordered, summary, themes = llm.triage(findings, repos, client=session)
+        ordered, summary, themes, usage = llm.triage(findings, repos, client=session)
 
         result = ScanResult(
             repos=repos,
@@ -57,6 +57,7 @@ def run(*, send_email: bool = True, http: httpx.Client | None = None) -> ScanRes
             image_tag=os.environ.get("IMAGE_TAG", "unknown"),
             summary=summary,
             themes=themes,
+            usage=usage,
         )
 
         if not send_email:

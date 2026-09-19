@@ -37,6 +37,20 @@ Stage 3 is the only one that can be skipped. No `DEEPSEEK-API-KEY`, or a failed
 call, and the digest goes out with its findings in severity order and no
 commentary.
 
+Every digest ends with what the commentary cost and what is left to pay for the
+next one:
+
+```
+repo-agent v0.1.0
+triage deepseek-flash · 2,702 in (0 cached) / 744 out · ~$0.0009 · $9.99 left
+```
+
+The cost carries a `~` because it is computed from a price table maintained by
+hand and will go stale; the balance comes from DeepSeek's own endpoint and does
+not. The balance is the one worth watching — a job that quietly stops triaging
+on an empty account is exactly the kind of silent failure this agent exists to
+catch elsewhere.
+
 ### What it checks
 
 | Check | Severity | What it means |

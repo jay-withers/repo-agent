@@ -31,12 +31,13 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import UTC, datetime
 
 import httpx
 from pydantic import BaseModel, Field, ValidationError
 
-from .fetch import FetchError, post_json
-from .models import Finding, RepoSnapshot
+from .fetch import FetchError, get_json, post_json
+from .models import Finding, RepoSnapshot, TriageUsage
 from .settings import optional_secret, settings
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,30 @@ MAX_OUTPUT_TOKENS = 1_500
 # Deterministic-ish, because a digest whose priorities reshuffle weekly for no
 # reason teaches you to distrust it.
 TEMPERATURE = 0.2
+
+# USD per million tokens for `deepseek-flash`, off-peak and peak.
+#
+# **A hand-maintained copy of someone else's price list**, so the cost it
+# produces is reported as an estimate and never as a fact. The balance below it
+# is the number to trust. Checked 2026-09-19 against
+# https://api-docs.deepseek.com/quick_start/pricing.
+#
+# Cache hits are fifty times cheaper than misses, which is why the two are
+# tracked separately rather than as one `prompt_tokens`.
+PRICES_USD_PER_MTOK = {
+    "cache_hit": {False: 0.003, True: 0.006},
+    "cache_miss": {False: 0.15, True: 0.3},
+    "output": {False: 0.6, True: 1.2},
+}
+
+# DeepSeek charges peak rates 01:00-04:00 and 06:00-10:00 UTC, Monday to Friday.
+# The scan's own 07:00 Monday cron sits inside the second window, so the digest
+# is billed at double — worth knowing before moving the schedule to save nothing.
+PEAK_WINDOWS_UTC = ((1, 4), (6, 10))
+
+# Enough for a few hundred more weekly runs. Below it the next digest is at real
+# risk of a 402, which would cost the commentary silently.
+LOW_BALANCE_USD = 1.0
 
 _SYSTEM_PROMPT = """\
 You are triaging the output of an automated GitHub repository scanner.
@@ -101,15 +126,15 @@ def triage(
     findings: list[Finding],
     repos: tuple[RepoSnapshot, ...],
     client: httpx.Client | None = None,
-) -> tuple[tuple[Finding, ...], str, tuple[str, ...]]:
+) -> tuple[tuple[Finding, ...], str, tuple[str, ...], TriageUsage | None]:
     """Reorder `findings` and produce a summary, or pass them through unchanged.
 
-    Returns `(findings, summary, themes)`. Never raises: a triage failure costs
-    the digest its commentary and its ordering, and must not cost the digest.
-    The findings are the product; the prose is decoration on top of them.
+    Returns `(findings, summary, themes, usage)`. Never raises: a triage failure
+    costs the digest its commentary and its ordering, and must not cost the
+    digest. The findings are the product; the prose is decoration on top of them.
     """
     if not findings:
-        return tuple(findings), "", ()
+        return tuple(findings), "", (), None
 
     # Absent key means the step is off, exactly as an absent DIGEST-EMAIL-TO
     # means the mail is not sent. This is what keeps `repoagent render` working
@@ -117,19 +142,22 @@ def triage(
     api_key = optional_secret("DEEPSEEK-API-KEY")
     if not api_key:
         logger.info("no DEEPSEEK-API-KEY, skipping triage")
-        return tuple(findings), "", ()
+        return tuple(findings), "", (), None
 
     try:
-        reply = _ask(api_key, _user_prompt(findings, repos), client=client)
+        reply, usage = _ask(api_key, _user_prompt(findings, repos), client=client)
     except (FetchError, ValidationError, ValueError, KeyError) as exc:
         logger.warning("triage failed, reporting findings unordered: %s", exc)
-        return tuple(findings), "", ()
+        return tuple(findings), "", (), None
 
-    return _apply(findings, reply), reply.summary.strip(), tuple(reply.themes)
+    # After the call, not before: the balance that matters is the one left for
+    # next week, and asking first would report a figure already out of date.
+    usage = _with_balance(usage, api_key, client=client)
+    return _apply(findings, reply), reply.summary.strip(), tuple(reply.themes), usage
 
 
-def _ask(api_key: str, prompt: str, client: httpx.Client | None) -> Triage:
-    """One chat completion, validated into a Triage."""
+def _ask(api_key: str, prompt: str, client: httpx.Client | None) -> tuple[Triage, TriageUsage]:
+    """One chat completion, validated into a Triage, with what it cost."""
     cfg = settings()
     payload = post_json(
         f"{cfg.deepseek_api_url}/chat/completions",
@@ -153,13 +181,97 @@ def _ask(api_key: str, prompt: str, client: httpx.Client | None) -> Triage:
         client=client,
     )
     content = payload["choices"][0]["message"]["content"]
-    usage = payload.get("usage") or {}
+    # The model the API *actually* served, not the one asked for: `deepseek-chat`
+    # is an undocumented alias that resolves to something else, and a cost
+    # attributed to the wrong model is worse than none.
+    usage = _usage(payload.get("usage") or {}, payload.get("model") or cfg.deepseek_model)
     logger.info(
-        "triage used %s prompt / %s completion tokens",
-        usage.get("prompt_tokens", "?"),
-        usage.get("completion_tokens", "?"),
+        "triage used %d prompt (%d cached) / %d completion tokens, est. $%.4f%s",
+        usage.prompt_tokens,
+        usage.cache_hit_tokens,
+        usage.completion_tokens,
+        usage.cost_usd or 0.0,
+        " at peak rates" if usage.peak else "",
     )
-    return Triage.model_validate_json(content)
+    return Triage.model_validate_json(content), usage
+
+
+def _usage(raw: dict, model: str, now: datetime | None = None) -> TriageUsage:
+    """Token counts from the API, and an estimated cost for them.
+
+    `prompt_cache_hit_tokens` and `prompt_cache_miss_tokens` are DeepSeek
+    extensions to the OpenAI usage shape. Where they are absent — another
+    compatible endpoint, or a future response — everything falls back to being
+    counted as a miss, which over-estimates rather than under-estimates.
+    """
+    prompt = int(raw.get("prompt_tokens", 0))
+    hit = int(raw.get("prompt_cache_hit_tokens", 0))
+    miss = int(raw.get("prompt_cache_miss_tokens", prompt - hit))
+    completion = int(raw.get("completion_tokens", 0))
+    peak = _is_peak(now or datetime.now(UTC))
+
+    cost = (
+        hit * PRICES_USD_PER_MTOK["cache_hit"][peak]
+        + miss * PRICES_USD_PER_MTOK["cache_miss"][peak]
+        + completion * PRICES_USD_PER_MTOK["output"][peak]
+    ) / 1_000_000
+
+    return TriageUsage(
+        model=model,
+        cache_hit_tokens=hit,
+        cache_miss_tokens=miss,
+        completion_tokens=completion,
+        peak=peak,
+        cost_usd=cost,
+    )
+
+
+def _is_peak(moment: datetime) -> bool:
+    """Whether DeepSeek's peak multiplier applies at `moment`.
+
+    Weekends are off-peak in full. **Chinese public holidays are also off-peak
+    and are not modelled**, so a run on one is costed at double what it actually
+    was — an over-estimate, which is the right direction for a number labelled
+    an estimate.
+    """
+    if moment.weekday() >= 5:
+        return False
+    return any(start <= moment.hour < end for start, end in PEAK_WINDOWS_UTC)
+
+
+def _with_balance(usage: TriageUsage, api_key: str, client: httpx.Client | None) -> TriageUsage:
+    """Attach the account's remaining balance, or leave it absent.
+
+    One extra GET a week, justified because a job that quietly stops triaging on
+    a 402 is precisely the silent failure this whole agent exists to catch. Never
+    raises: not knowing the balance must not cost the digest its findings.
+    """
+    from dataclasses import replace
+
+    try:
+        payload = get_json(
+            f"{settings().deepseek_api_url}/user/balance",
+            headers={"Authorization": f"Bearer {api_key}"},
+            client=client,
+        )
+    except (FetchError, ValueError, KeyError) as exc:
+        logger.warning("could not read DeepSeek balance: %s", exc)
+        return usage
+
+    # Several currencies can be returned; USD is the one the prices above are in.
+    infos = payload.get("balance_infos") or []
+    usd = next((i for i in infos if i.get("currency") == "USD"), None)
+    if usd is None:
+        return usage
+
+    balance = str(usd.get("total_balance", ""))
+    try:
+        if float(balance) < LOW_BALANCE_USD:
+            logger.warning("DeepSeek balance is $%s — triage will stop when it runs out", balance)
+    except ValueError:
+        pass
+
+    return replace(usage, balance_usd=balance)
 
 
 def _apply(findings: list[Finding], reply: Triage) -> tuple[Finding, ...]:

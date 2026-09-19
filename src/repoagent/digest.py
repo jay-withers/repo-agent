@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from html import escape
 
-from .models import ScanResult
+from .models import ScanResult, TriageUsage
 
 # Kept deliberately plain. This is read in a mail client, where anything clever
 # renders differently in each one, and the content is a table and some links.
@@ -90,7 +90,28 @@ def render_text(result: ScanResult) -> str:
     # the image in another, "what actually ran" is otherwise cross-repo
     # archaeology.
     lines.append(f"repo-agent {result.image_tag}")
+    if result.usage:
+        lines.append(triage_footer(result.usage))
     return "\n".join(lines)
+
+
+def triage_footer(usage: TriageUsage) -> str:
+    """What the commentary above cost, and whether there is money for the next one.
+
+    The cost is prefixed `~` because it comes from a price table maintained by
+    hand in `llm.py`; the balance is not, because it comes from DeepSeek. Showing
+    both is the point — the estimate can drift, the balance cannot.
+    """
+    parts = [
+        f"triage {usage.model}",
+        f"{usage.prompt_tokens:,} in ({usage.cache_hit_tokens:,} cached) "
+        f"/ {usage.completion_tokens:,} out",
+    ]
+    if usage.cost_usd is not None:
+        parts.append(f"~${usage.cost_usd:.4f}{' peak' if usage.peak else ''}")
+    if usage.balance_usd is not None:
+        parts.append(f"${usage.balance_usd} left")
+    return " · ".join(parts)
 
 
 def render_html(result: ScanResult) -> str:
@@ -147,6 +168,8 @@ def render_html(result: ScanResult) -> str:
         f"{findings_html}"
         f"<h2 style='font-size:16px'>Repositories</h2>"
         f"<table style='border-collapse:collapse'>{''.join(rows)}</table>"
-        f"<p style='color:#888; font-size:12px'>repo-agent {result.image_tag}</p>"
-        f"</div>"
+        f"<p style='color:#888; font-size:12px'>repo-agent {escape(result.image_tag)}"
+        + (f"<br>{escape(triage_footer(result.usage))}" if result.usage else "")
+        + "</p>"
+        "</div>"
     )
