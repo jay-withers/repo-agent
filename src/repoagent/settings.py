@@ -12,9 +12,16 @@ secret is absent, whereas this resolves at runtime and simply reports what is
 missing.
 
 The name mapping is mechanical: `secret("GITHUB-APP-ID")` reads
-`$GITHUB_APP_ID`, falling back to the Key Vault secret named `GITHUB-APP-ID`.
+`$GITHUB_APP_ID`, then `.env`, then the Key Vault secret named `GITHUB-APP-ID`.
 Key Vault forbids underscores in names, environment variables conventionally
 forbid hyphens, so one of the two has to be rewritten.
+
+**Diverges from market-agent: the `.env` step is new here.** `SettingsConfigDict`
+loads `.env` into the `Settings` *class* only — it never touches `os.environ` —
+so a secret written to `.env` was silently ignored and the lookup fell through to
+Key Vault, or failed. Every document in both repositories claimed otherwise. Port
+this back rather than letting the two drift; per CLAUDE.md, the same bug fixed
+twice in copied code is the tripwire for extracting a library.
 """
 
 from __future__ import annotations
@@ -80,6 +87,22 @@ def settings() -> Settings:
     return Settings()
 
 
+@lru_cache(maxsize=1)
+def dotenv() -> dict[str, str]:
+    """`.env` as a plain dict, or empty when there is no such file.
+
+    Read with the same parser `Settings` uses, so a value quoted for one is
+    quoted for the other — which matters for `GITHUB_APP_PRIVATE_KEY`, a PEM
+    whose newlines only survive as `\n` inside quotes.
+
+    Resolved relative to the working directory rather than to this file: `.env`
+    belongs to whoever is running the command, and in the image there is none.
+    """
+    from dotenv import dotenv_values
+
+    return {key: value for key, value in dotenv_values(".env").items() if value is not None}
+
+
 @cache
 def secret(name: str) -> str:
     """Resolve a secret by its hyphenated Key Vault name.
@@ -88,7 +111,7 @@ def secret(name: str) -> str:
     about not paying for the same round trip twice within a run rather than
     about long-lived reuse.
     """
-    from_env = os.environ.get(name.replace("-", "_").upper())
+    from_env = _from_environment(name)
     if from_env:
         return from_env
 
@@ -122,7 +145,7 @@ def optional_secret(name: str) -> str | None:
     authentication or network error propagates, because "the credential is
     broken" must not look like "no recipient configured".
     """
-    from_env = os.environ.get(name.replace("-", "_").upper())
+    from_env = _from_environment(name)
     if from_env:
         return from_env
 
@@ -138,6 +161,16 @@ def optional_secret(name: str) -> str | None:
         return client.get_secret(name).value or None
     except ResourceNotFoundError:
         return None
+
+
+def _from_environment(name: str) -> str | None:
+    """A secret from the process environment, then `.env`.
+
+    The real environment wins, so an inline `FOO=bar make run` overrides a
+    checked-out `.env` rather than being silently ignored by it.
+    """
+    variable = name.replace("-", "_").upper()
+    return os.environ.get(variable) or dotenv().get(variable)
 
 
 # The scope a Key Vault data-plane token is issued for. `az` calls the same

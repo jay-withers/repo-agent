@@ -88,10 +88,23 @@ out of band by whoever holds `Key Vault Secrets Officer`; the workload identity
 gets read-only `Key Vault Secrets User` on its own vault, which is already
 tightly scoped because the vault is per-project.
 
-**`settings.secret()` reads the environment first and Key Vault second.** That
-is what makes `make run` work with no Azure at all, and it is why `.env.example`
-exists. Never commit a filled-in `.env` — `.gitignore` excludes `.env` and
-`.env.*` and lets the template through.
+**`settings.secret()` reads the process environment, then `.env`, then Key
+Vault.** That is what makes `make run` work with no Azure at all, and it is why
+`.env.example` exists. Never commit a filled-in `.env` — `.gitignore` excludes
+`.env` and `.env.*` and lets the template through.
+
+**The `.env` step is a deliberate divergence from market-agent's copy.**
+`SettingsConfigDict(env_file=".env")` loads that file into the `Settings` class
+only and never into `os.environ`, so every secret written to `.env` was silently
+ignored and fell through to Key Vault — while every document in both repositories
+claimed otherwise. `settings.py` therefore imports `python-dotenv` directly, and
+declares it rather than leaning on pydantic-settings' transitive copy. Port the
+fix back; per the copied-modules rule below, the same bug fixed twice is the
+tripwire for extracting a library.
+
+Setting `KEY_VAULT_URI` in a local `.env` is a supported way to work: the secrets
+then resolve from the real vault through your own `az login`, and no private key
+is written to disk.
 
 Secrets in use: `GITHUB-APP-ID`, `GITHUB-APP-PRIVATE-KEY`, `DIGEST-EMAIL-TO`,
 `RESEND-API-KEY`, `DEEPSEEK-API-KEY`.
@@ -197,10 +210,19 @@ twice in copied code.
 
 ## Testing
 
-`make test`. Tests never touch the network or Azure: `tests/conftest.py` sets
-every secret as an environment variable and **deletes `KEY_VAULT_URI`**, so a
-missing one fails rather than falling through to a real call, and it clears the
-`settings()` and `secret()` caches around each test. HTTP is faked with
+`make test`. Tests never touch the network or Azure. `tests/conftest.py`:
+
+- **`chdir`s into an empty `tmp_path`**, so a developer's own `.env` cannot reach
+  the suite. Both `Settings` and `secret()` resolve `.env` relative to the
+  working directory, and deleting an environment variable does not stop either
+  reading the file — which silently gave anyone with a `.env` a different test
+  suite from CI.
+- Sets every secret as an environment variable and **sets `KEY_VAULT_URI`
+  empty rather than deleting it**, so a missing secret fails rather than falling
+  through to a real call. An explicit empty value beats a `.env`; an absent one
+  does not.
+- Clears the `settings()`, `secret()`, `optional_secret()` and `dotenv()` caches
+  around each test. HTTP is faked with
 `httpx.MockTransport` via `tests/helpers.py`. `tests/` is a package, so helpers
 import as `tests.helpers` — a bare `from conftest import ...` does not resolve.
 
