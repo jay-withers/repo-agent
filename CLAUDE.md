@@ -14,13 +14,47 @@ working, and emails a weekly digest on Monday mornings.
 for each with one batched GraphQL query, runs deterministic checks, asks
 DeepSeek to triage the results, and emails a digest.
 
-**Persistence is the next thing.** Nothing is stored between runs, so the
-digest cannot say what is new since last week and a finding with no GitHub
-timestamp has no age. `Finding.id` exists for exactly this. The intended shape
-is one JSON blob in an Azure Storage account — `{finding_id: first_seen}` —
-read at the top of `scan.run()` and written at the end, authenticated with the
-managed identity so it adds no new secret. Not Postgres: market-agent has one,
-this does not need one to store a few hundred rows.
+## History
+
+One JSON document in a blob, read whole at the start of a run and written whole
+at the end — `state.py`. A blob rather than a table because there is no query to
+serve, and a weekly job with `parallelism = 1` has no concurrent writer. Not
+Postgres: market-agent has one, this does not need one for a few hundred rows.
+
+It carries `{finding_id: {first_seen, repo, check, title}}` plus suppressions.
+`repo/check/title` are stored only so a **resolved** finding can be named — once
+it is resolved no check produces it, so nothing else describes it.
+
+- **`Finding.id` is load-bearing.** A hash of `repo:check`, derived rather than
+  stored so two scans of an unchanged repository agree. Change how it is
+  computed and every finding in the estate reads as new for one week.
+- **`first_seen` is deliberately not `age_days`.** One is how long the fact has
+  been true (from a GitHub timestamp), the other how long we have known. Merging
+  them would claim a missing LICENCE appeared the day the agent first ran.
+- **Reconcile runs before triage**, so a suppressed finding never reaches
+  DeepSeek: no point paying to prioritise something that will not be printed.
+- **State is saved last, after the email, and only if it was sent.** A run that
+  failed to send must not record its findings as seen, or the retry reports
+  nothing as new. `render` never saves at all — otherwise `make run` twice would
+  empty Monday's "new" section.
+- Absent state degrades to "everything is new" and never fails the run, the same
+  contract as triage.
+
+**Suppressions are decisions, so they are recorded with a reason** — `--reason`
+is required on `repoagent suppress`, not optional. An optional expiry exists
+because most "we'll live with it" is really "not this quarter". An unparseable
+expiry *expires* rather than lasting for ever, since a typo that silently
+suppresses a finding permanently is the failure nobody notices. Expired and
+orphaned rules are dropped on each run.
+
+The operator commands (`state`, `suppress`, `unsuppress`) **report failure**,
+unlike the scan: a silent no-op would leave someone believing they had
+suppressed something, and they would find out next Monday.
+
+**`STATE_CONTAINER_URL` lives in `common_env`, which is under
+`ignore_changes`** — so Terraform will never push it to a running job. `make
+deploy` sets it alongside `IMAGE_TAG` for exactly that reason. An existing job
+picks it up on the next deploy, not on apply.
 
 ## The two-repo split
 

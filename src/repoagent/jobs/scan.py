@@ -1,18 +1,28 @@
 """The scan: authenticate, read every repository, check it, triage, report.
 
-Four stages, and the order of the middle two is the whole design:
+Five stages, and the order of the middle ones is the whole design:
 
 1. **Fetch.** The REST installation list, then one batched GraphQL query for the
    detail behind it. A failure of the second degrades the run; a failure of the
    first ends it.
 2. **Check.** Pure functions in `checks/` turn each snapshot into findings.
    Every fact the digest reports is established here.
-3. **Triage.** `llm.py` asks DeepSeek to order those findings and write a
+3. **Reconcile.** `state.py` places those findings against what the last run
+   saw: which are new, which have gone, which a suppression is holding back.
+4. **Triage.** `llm.py` asks DeepSeek to order what remains and write a
    paragraph of context. It cannot add, remove or alter a finding.
-4. **Report.** `digest.py` renders, `mailer.py` sends.
+5. **Report.** `digest.py` renders, `mailer.py` sends.
 
-Stage 3 is the only one that can be skipped — no API key, or a failed call, and
-the digest goes out with its findings in check order and no commentary.
+Stages 3 and 4 can both be skipped — no storage account, no API key, or a
+failure in either, and the digest still goes out with its findings. What is lost
+is the deltas and the commentary, never the findings themselves.
+
+**Reconcile runs before triage**, so a suppressed finding is never sent to
+DeepSeek: there is no point paying to prioritise something the digest will not
+print, and a suppression is a decision the model has no business revisiting.
+
+**State is saved last, after the email.** A run that fails to send must not
+record its findings as seen, or the retry reports nothing as new.
 """
 
 from __future__ import annotations
@@ -22,7 +32,7 @@ import os
 
 import httpx
 
-from .. import checks, digest, llm, mailer
+from .. import checks, digest, llm, mailer, state
 from ..github import client as github_client
 from ..github import parse
 from ..models import Finding, RepoSnapshot, ScanResult
@@ -48,8 +58,21 @@ def run(*, send_email: bool = True, http: httpx.Client | None = None) -> ScanRes
     session = http or httpx.Client(timeout=30.0)
     try:
         repos = _snapshots(session)
-        findings = _findings(repos)
-        ordered, summary, themes, usage = llm.triage(findings, repos, client=session)
+        found = _findings(repos)
+
+        against = state.load()
+        reconciled = state.reconcile(against, found)
+        logger.info(
+            "%d finding(s): %d new, %d resolved, %d suppressed",
+            len(reconciled.findings),
+            len(reconciled.new),
+            len(reconciled.resolved),
+            len(reconciled.suppressed),
+        )
+
+        ordered, summary, themes, usage = llm.triage(
+            list(reconciled.findings), repos, client=session
+        )
 
         result = ScanResult(
             repos=repos,
@@ -58,9 +81,15 @@ def run(*, send_email: bool = True, http: httpx.Client | None = None) -> ScanRes
             summary=summary,
             themes=themes,
             usage=usage,
+            resolved=tuple((k.repo, k.title) for k in reconciled.resolved),
+            suppressed_count=len(reconciled.suppressed),
         )
 
         if not send_email:
+            # `render` deliberately does not save. Printing the digest locally
+            # must not mark everything as seen and rob the next real run of its
+            # deltas — running `make run` twice would otherwise empty the "new"
+            # section of Monday's email.
             return result
 
         outcome = mailer.send(
@@ -78,6 +107,11 @@ def run(*, send_email: bool = True, http: httpx.Client | None = None) -> ScanRes
             len(ordered),
             outcome.status,
         )
+
+        # Last, and only once the digest is out. A run that failed to send must
+        # not record its findings as seen, or the retry reports nothing as new.
+        if outcome.status != "skipped":
+            state.save(reconciled.state)
         return result
     finally:
         if owned:

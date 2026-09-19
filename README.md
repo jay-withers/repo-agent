@@ -87,16 +87,31 @@ count and no trades table, accurately reported from what it had been given that
 nothing had happened on a day three trades executed. The defence is not a better
 prompt — it is never letting the model near a number that gets reported.
 
-**Stateless, weekly — for now.** There is no database. Every finding carries an
-`age_days` derived from a GitHub timestamp the agent did not invent, so a digest
-can split "new this week" from "open for 21 days" out of a single scan, and
-fixing something makes it disappear next Monday.
+**Weekly, with a memory.** One JSON document in a blob — read at the start of a
+run, written at the end — lets the digest say what is **new** since last week
+and what has been **resolved**. A blob, not a database: the whole access pattern
+is read-whole then write-whole, once a week, with no concurrent writer.
 
-The limit of that is real: a finding with no GitHub timestamp behind it — a
-missing LICENSE has always been missing — has no age at all, and the digest
-cannot say what changed since last week. `Finding.id` is a stable hash of
-`repo:check` precisely so a `{finding_id: first_seen}` map can be added later
-without reworking anything.
+Losing it costs one week's deltas, not correctness, which is why it is LRS with
+no `prevent_destroy`. Blob versioning is on, so every prior week's document is
+still retrievable.
+
+`Finding.id` is a stable hash of `repo:check`, so two scans of an unchanged
+repository agree about what they are looking at. Everything else depends on that.
+
+**Findings you have decided to live with can be suppressed**, with a reason and
+optionally an expiry:
+
+```bash
+make state                      # what it remembers, including suppressions
+uv run repoagent suppress a1b2c3d4e5f6 \
+  --reason "deliberate teaching repo" --until 2026-12-01
+uv run repoagent unsuppress a1b2c3d4e5f6
+```
+
+The reason is required, not optional — in six months an unexplained suppression
+is indistinguishable from a bug. Suppressed findings never reach the model, and
+the digest reports how many are held back so they do not become invisible.
 
 **LLM triage is optional and off by default.** `DEEPSEEK-API-KEY` is read with
 `optional_secret()`, so its absence switches the step off instead of failing the

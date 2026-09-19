@@ -10,7 +10,7 @@ IMAGE_TAG_EXPLICIT := $(filter-out file,$(origin IMAGE_TAG))
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install lint test run build push deploy start logs init fmt validate plan apply secrets
+.PHONY: help install lint test run build push deploy start logs state init fmt validate plan apply secrets
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -61,7 +61,14 @@ deploy: ## Roll an image tag onto the job (IMAGE_TAG required)
 		--name "$$(terraform -chdir=$(TF_DIR) output -raw scan_job_name)" \
 		--resource-group "$$(terraform -chdir=$(TF_DIR) output -raw resource_group_name)" \
 		--image $(IMAGE_REGISTRY)/repoagent:$(IMAGE_TAG) \
-		--set-env-vars IMAGE_TAG=$(IMAGE_TAG)
+		--set-env-vars IMAGE_TAG=$(IMAGE_TAG) \
+		STATE_CONTAINER_URL="$$(terraform -chdir=$(TF_DIR) output -raw state_container_url)"
+
+# Reads and writes the real state document, so it needs Storage Blob Data
+# Contributor on the container — which whoever applied the Terraform has.
+state: ## Print what the scan remembers between runs
+	STATE_CONTAINER_URL="$$(terraform -chdir=$(TF_DIR) output -raw state_container_url)" \
+		uv run repoagent state
 
 # A scheduled job has no other way to be triggered.
 start: ## Trigger one scan execution now

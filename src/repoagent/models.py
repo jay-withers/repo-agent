@@ -94,6 +94,13 @@ class Finding:
     # LICENSE has always been missing.
     age_days: int | None = None
 
+    # Filled in by `state.reconcile`, not by the checks. Deliberately separate
+    # from `age_days`: that is how long the *fact* has been true, this is how
+    # long we have known about it, and conflating them would claim a missing
+    # LICENCE appeared on the day the agent first ran.
+    first_seen: str | None = None
+    is_new: bool = False
+
     @property
     def id(self) -> str:
         """A stable identity for this finding, for de-duplication later.
@@ -152,3 +159,11 @@ class ScanResult:
     # None when triage did not run. Computed from the API's own usage figures,
     # never written by the model — the same rule as every other number here.
     usage: TriageUsage | None = None
+
+    # Findings a previous run saw that no check produced this time. Carried as
+    # `(repo, title)` because by definition there is no longer a Finding to
+    # point at.
+    resolved: tuple[tuple[str, str], ...] = ()
+    # How many findings a suppression held back, so the digest can say so
+    # without listing them. A suppression nobody can see is one nobody revisits.
+    suppressed_count: int = 0
