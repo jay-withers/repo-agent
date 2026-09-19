@@ -14,6 +14,7 @@ appears below.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import httpx
@@ -95,7 +96,16 @@ _REPO_FRAGMENT = """
     defaultBranchRef { name }
     %(files)s
     workflows: object(expression: "HEAD:.github/workflows") {
-      ... on Tree { entries { name } }
+      ... on Tree {
+        entries {
+          name
+          # The text, not just the name: whether an action is pinned to a commit
+          # and which runner a job asks for are both answered by the contents and
+          # by nothing else. Workflow files are small; a README is the thing worth
+          # being careful about.
+          object { ... on Blob { text } }
+        }
+      }
     }
     pullRequests(states: OPEN, first: 30, orderBy: {field: CREATED_AT, direction: ASC}) {
       totalCount
@@ -126,6 +136,15 @@ def _file_selection() -> str:
     for i, path in enumerate(RENOVATE_CONFIG_PATHS):
         parts.append(f'renovate{i}: object(expression: "HEAD:{path}") {{ ... on Blob {{ text }} }}')
     parts.append('readme: object(expression: "HEAD:README.md") { ... on Blob { text } }')
+    # The lock file's *platform hashes* are the point: one missing linux_amd64
+    # fails pre-commit in CI on every pull request, which is a trap this estate
+    # has already fallen into. See CLAUDE.md.
+    parts.append(
+        'tflock: object(expression: "HEAD:terraform/.terraform.lock.hcl") { ... on Blob { text } }'
+    )
+    parts.append(
+        'tflock_root: object(expression: "HEAD:.terraform.lock.hcl") { ... on Blob { text } }'
+    )
     parts.append('dockerfile: object(expression: "HEAD:Dockerfile") { ... on Blob { text } }')
     return "\n    ".join(parts)
 
@@ -181,3 +200,90 @@ def repo_details(
 
     logger.info("fetched detail for %d repositories", len(details))
     return details
+
+
+# Where the estate's catalogue of every repository lives. Read through the same
+# installation token as everything else — the App is installed on this repository
+# too, so it needs no extra permission.
+#
+# Configurable rather than hard-coded so this is not silently wrong for anyone
+# whose catalogue lives elsewhere, and so an empty setting switches the check off
+# rather than producing a finding against every repository at once.
+def catalogue(client: httpx.Client | None = None) -> frozenset[str] | None:
+    """Every repository name `github-repos` declares, or None if unreadable.
+
+    **None and empty mean different things.** None is "the catalogue could not be
+    read", which must never render as "every repository is unmanaged"; an empty
+    set is a catalogue that genuinely declares nothing.
+    """
+    cfg = settings()
+    if not cfg.catalogue_repo:
+        return None
+
+    owner, _, name = cfg.catalogue_repo.partition("/")
+    query = """
+    query Catalogue($owner: String!, $name: String!, $path: String!) {
+      repository(owner: $owner, name: $name) {
+        object(expression: $path) { ... on Blob { text } }
+      }
+    }
+    """
+    try:
+        data = graphql(
+            cfg.github_graphql_url,
+            query=query,
+            variables={"owner": owner, "name": name, "path": f"HEAD:{cfg.catalogue_path}"},
+            headers=auth.auth_headers(client=client),
+            client=client,
+        )
+    except Exception as exc:
+        logger.warning("could not read the catalogue at %s: %s", cfg.catalogue_repo, exc)
+        return None
+
+    text = (((data or {}).get("repository") or {}).get("object") or {}).get("text")
+    if not isinstance(text, str):
+        logger.warning("no catalogue file at %s:%s", cfg.catalogue_repo, cfg.catalogue_path)
+        return None
+
+    names = parse_catalogue(text)
+    logger.info("catalogue declares %d repositories", len(names))
+    return names
+
+
+def parse_catalogue(text: str) -> frozenset[str]:
+    """The repository names declared in a `repos = { ... }` tfvars block.
+
+    A brace-depth scan rather than a regex over the whole file, because the
+    values contain nested blocks — `required_status_checks = [{ context = ... }]`
+    — and a pattern loose enough to find the keys is loose enough to find those
+    too. Depth is tracked so only the keys directly inside `repos` are taken.
+
+    Not a real HCL parser: adding one for a file of quoted keys would be a
+    dependency for one check. This reads what the catalogue actually looks like
+    and ignores anything it does not recognise.
+    """
+    names: set[str] = set()
+    depth = 0
+    in_repos = False
+
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+
+        if not in_repos:
+            if re.match(r"^repos\s*=\s*\{", line):
+                in_repos = True
+                depth = 1
+            continue
+
+        # A quoted key opening a block, directly inside `repos`.
+        match = re.match(r'^"([^"]+)"\s*=\s*\{\s*$', line)
+        if depth == 1 and match:
+            names.add(match.group(1))
+
+        depth += line.count("{") - line.count("}")
+        if depth <= 0:
+            break
+
+    return frozenset(names)

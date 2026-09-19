@@ -14,9 +14,40 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from repoagent.models import PullRequest, RepoSnapshot
+from repoagent.models import PullRequest, RepoSnapshot, Workflow
 
-HEALTHY_RENOVATE = '{"extends": ["config:recommended"], "packageRules": []}'
+HEALTHY_RENOVATE = '{"extends": ["github>jay-withers/renovate"], "packageRules": []}'
+
+# A workflow with nothing wrong with it: a supported runner, and every action
+# pinned to a commit with the tag as a comment — this estate's own convention.
+HEALTHY_WORKFLOW = """\
+name: CI
+on: [pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: jay-withers/workflows/ci.yml@2d4b1e0f3a5c7d9e1f2a3b4c5d6e7f8091a2b3c4 # v1.2.0
+"""
+
+# One `h1:` per platform locked, which is what a real lock file carries — the
+# platform *names* appear nowhere in one.
+HEALTHY_TF_LOCK = """\
+provider "registry.terraform.io/hashicorp/azurerm" {
+  version = "5.6.0"
+  hashes = [
+    "h1:0GEze9b+Z5XuA1H9v+NfgQ7yO9XfxV4YaCvWAJ3Ul/k=",
+    "h1:41VFAA3JqAsqQovfhif8aRkmgv6KuuppxSLe34mK7j8=",
+    "h1:KcCIg3phnZW7/clpgZ6hDnhco6CNh/Hc00nQQZTIBjQ=",
+    "zh:0f4c7b924708dcdf58b7077988549a07dabe6800cef7666a00a0d0ba27aa49d4",
+  ]
+}
+"""
+
+
+def workflow(name: str = "ci.yml", text: str = HEALTHY_WORKFLOW) -> Workflow:
+    return Workflow(name=name, text=text)
 
 
 def snapshot(**overrides: object) -> RepoSnapshot:
@@ -37,7 +68,9 @@ def snapshot(**overrides: object) -> RepoSnapshot:
         "renovate_config_path": "renovate.json",
         "readme": "# widget\n",
         "dockerfile": None,
-        "workflows": ("ci.yml",),
+        "workflows": (workflow(),),
+        "terraform_lock": None,
+        "in_catalogue": True,
         "open_prs": (),
         "last_release": "v1.0.0",
         "last_release_at": datetime.now(UTC) - timedelta(days=10),

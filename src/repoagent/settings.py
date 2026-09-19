@@ -73,6 +73,12 @@ class Settings(BaseSettings):
     # this job would find out on a Monday.
     deepseek_model: str = "deepseek-flash"
 
+    # The repository whose Terraform declares every repository in the estate,
+    # and the file inside it. Empty switches the "unmanaged repository" check
+    # off entirely rather than flagging everything at once.
+    catalogue_repo: str = "jay-withers/github-repos"
+    catalogue_path: str = "terraform/terraform.tfvars"
+
     # Blob container holding the scan's history. Empty switches history off
     # entirely — every finding then reports as new, which is the right default
     # locally and what keeps `make run` working with no storage account.

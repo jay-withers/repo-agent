@@ -313,7 +313,10 @@ def _user_prompt(findings: list[Finding], repos: tuple[RepoSnapshot, ...]) -> st
                 "repo": name,
                 "description": repo.description,
                 "private": repo.private,
-                "workflows": list(repo.workflows),
+                # Names only. The contents are fetched for the checks and are
+                # deliberately not sent: a dozen workflow files per repository
+                # would dominate the prompt and tell the model nothing it can act on.
+                "workflows": list(repo.workflow_names),
                 "open_renovate_prs": len(repo.renovate_prs),
                 "last_release": repo.last_release,
                 "renovate_config": _clip(repo.renovate_config, "renovate"),

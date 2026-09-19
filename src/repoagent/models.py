@@ -37,6 +37,20 @@ class PullRequest:
 
 
 @dataclass(frozen=True)
+class Workflow:
+    """One GitHub Actions workflow file, with its contents.
+
+    The text is carried because the interesting questions are about what is
+    *in* it — whether actions are pinned to a commit, which runner it asks for —
+    and a filename answers none of them. It never reaches the triage prompt;
+    `llm._user_prompt` sends names only.
+    """
+
+    name: str
+    text: str = ""
+
+
+@dataclass(frozen=True)
 class RepoSnapshot:
     """Everything the checks are allowed to see about one repository.
 
@@ -69,7 +83,12 @@ class RepoSnapshot:
     renovate_config_path: str | None = None
     readme: str | None = None
     dockerfile: str | None = None
-    workflows: tuple[str, ...] = ()
+    workflows: tuple[Workflow, ...] = ()
+    # `.terraform.lock.hcl` from the repository root, where there is one.
+    terraform_lock: str | None = None
+    # Whether `github-repos` declares this repository. None when the
+    # catalogue could not be read, which must not read as "unmanaged".
+    in_catalogue: bool | None = None
     open_prs: tuple[PullRequest, ...] = ()
     last_release: str | None = None
     last_release_at: datetime | None = None
@@ -77,6 +96,10 @@ class RepoSnapshot:
     @property
     def renovate_prs(self) -> tuple[PullRequest, ...]:
         return tuple(pr for pr in self.open_prs if pr.is_renovate)
+
+    @property
+    def workflow_names(self) -> tuple[str, ...]:
+        return tuple(w.name for w in self.workflows)
 
 
 @dataclass(frozen=True)

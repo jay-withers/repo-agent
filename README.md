@@ -64,9 +64,22 @@ catch elsewhere.
 | `hygiene.no_license` | medium | Public repository with no detectable licence |
 | `hygiene.no_description` | low | Unidentifiable in a list |
 | `hygiene.stale` | low | No pushes in six months |
+| `estate.unmanaged` | high | On GitHub but absent from the `github-repos` catalogue |
+| `estate.incomplete_terraform_lock` | high | Providers locked for fewer platforms than run Terraform |
+| `estate.not_shared_preset` | low | Renovate config does not extend the estate's shared preset |
+| `workflows.unpinned_actions` | high | Third-party action referenced by a mutable tag |
+| `workflows.unpinned_first_party_actions` | low | GitHub-owned action on a tag |
+| `workflows.retired_runners` | medium | Runner image GitHub has withdrawn or will |
 
 Archived repositories are skipped wholesale: every finding would be true,
 unactionable and permanent, which is how you train someone to ignore an email.
+
+The estate checks are the ones worth having here specifically. This estate is
+*declared* — `jay-withers/github-repos` holds a catalogue of every repository
+and applies branch protection and required checks from it — so asking "does this
+repo have branch protection" mostly re-reports that repo's own Terraform. The
+useful inversion is coverage: **what exists on GitHub that the catalogue does
+not know about**, since nothing is enforcing anything on it.
 
 ## Design
 

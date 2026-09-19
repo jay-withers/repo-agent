@@ -152,6 +152,39 @@ to a value pasted with curly quotes, which are invisible in
 `az keyvault secret show` output. Read the codepoints (`| cat -A`) when a send
 fails on the address.
 
+## Checking an estate that is already declared
+
+`jay-withers/github-repos` holds a catalogue of every repository and applies
+branch protection, required checks, description and topics from it. So a check
+asking "does this repo have branch protection" would mostly re-report that
+repo's own Terraform. **The useful inversion is coverage** — `estate.unmanaged`
+asks what exists on GitHub that the catalogue does not declare, because nothing
+is enforcing anything on those.
+
+`in_catalogue` is a **tri-state**. `None` means the catalogue could not be read
+and must never render as "every repository is unmanaged", which is what a plain
+boolean produces the first time the file moves. `catalogue_repo` empty switches
+the check off entirely for the same reason.
+
+`parse_catalogue` is a brace-depth scan, not a regex over the whole file: the
+values contain nested blocks (`required_status_checks = [{ context = ... }]`)
+and any pattern loose enough to find the repository keys also finds those. It is
+deliberately not a real HCL parser — that would be a dependency for one check.
+
+**A `.terraform.lock.hcl` never names a platform.** The first version of
+`estate.incomplete_terraform_lock` searched for the literal `linux_amd64` and
+consequently reported every Terraform repository in the estate, including this
+one, whose lock is correct. Platform coverage is the **count of `h1:` hashes per
+provider block** — one per platform locked — and `zh:` entries are the
+registry's zip hashes, present regardless, so counting those proves nothing.
+`test_platform_names_are_never_looked_for_in_a_lock_file` pins this.
+
+Workflow **contents** are fetched, not just filenames, because whether an action
+is pinned to a commit and which runner a job asks for are answered by the text
+and nothing else. They are deliberately **not** sent to the triage prompt —
+`llm._user_prompt` sends `workflow_names` — since a dozen workflow files per
+repository would dominate it.
+
 ## The checks, and what the model is allowed to do
 
 **Checks are pure `(RepoSnapshot) -> list[Finding]` functions in `checks/`, and

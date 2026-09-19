@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import replace
 
 import httpx
 
@@ -142,7 +143,17 @@ def _snapshots(session: httpx.Client) -> tuple[RepoSnapshot, ...]:
         logger.warning("detail query failed, continuing without it: %s", exc)
         return tuple(repos)
 
-    return tuple(parse.merge_detail(repo, details.get(repo.full_name)) for repo in repos)
+    # None when unreadable, which `estate.unmanaged` treats as "do not judge" —
+    # a moved catalogue file must not report the whole estate as unmanaged.
+    declared = github_client.catalogue(client=session)
+
+    return tuple(
+        replace(
+            parse.merge_detail(repo, details.get(repo.full_name)),
+            in_catalogue=None if declared is None else repo.name in declared,
+        )
+        for repo in repos
+    )
 
 
 def _findings(repos: tuple[RepoSnapshot, ...]) -> list[Finding]:
