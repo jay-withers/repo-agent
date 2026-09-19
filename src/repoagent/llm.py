@@ -37,7 +37,7 @@ import httpx
 from pydantic import BaseModel, Field, ValidationError
 
 from .fetch import FetchError, get_json, post_json
-from .models import Finding, RepoSnapshot, TriageUsage
+from .models import Finding, RepoSnapshot, Suggestion, TriageOutcome, TriageUsage
 from .settings import optional_secret, settings
 
 logger = logging.getLogger(__name__)
@@ -47,10 +47,16 @@ logger = logging.getLogger(__name__)
 # useful for judging dependency health, so it gets the smallest share.
 PROMPT_FILE_BUDGET = {"renovate": 2_000, "readme": 1_200, "dockerfile": 1_200}
 
-# Enough for a paragraph of context and an ordering, not enough to write an
-# essay nobody reads. Also a cost ceiling: DeepSeek bills output tokens at
-# several times the input rate.
-MAX_OUTPUT_TOKENS = 1_500
+# Enough for a paragraph, an ordering and a few suggestions — with headroom for
+# the reasoning `deepseek-flash` does before any of it.
+#
+# **Reasoning tokens count against this budget and are billed as output**, and
+# they are not visible in the reply. 1,500 was comfortable until suggestions were
+# added, at which point the model reasoned harder, hit the ceiling mid-JSON, and
+# every run degraded to "triage failed" with a validation error that said nothing
+# about the real cause. `_ask` now names truncation explicitly, but the headroom
+# is what stops it happening.
+MAX_OUTPUT_TOKENS = 4_000
 
 # Deterministic-ish, because a digest whose priorities reshuffle weekly for no
 # reason teaches you to distrust it.
@@ -99,14 +105,42 @@ thing, name the repository, and say what action it needs.
 5. If nothing is genuinely urgent, say so plainly in one sentence rather than \
 manufacturing concern.
 
+You may also suggest improvements the scanner does not check for. These are \
+opinions, are rendered separately from the findings, and are not counted \
+anywhere. Rules for them:
+
+6. Never restate a finding as a suggestion. The findings are already reported.
+7. Never suggest something the scanner already checks: Renovate configuration \
+and PR backlogs, README, LICENCE, description, CI presence, repository \
+staleness, catalogue membership, Terraform lock platforms, action pinning, \
+runner versions, shared Renovate preset.
+8. Be specific to what you were shown. "Add tests" is worthless; "the Dockerfile \
+installs build tools into the runtime stage" is worth reading.
+9. At most four. Fewer is better. An empty list is a fine answer.
+
 Respond with JSON only, matching this shape:
 
 {"summary": "<at most three sentences>", "order": ["<finding id>", ...], \
-"themes": ["<short phrase>", ...]}
+"themes": ["<short phrase>", ...], \
+"suggestions": [{"repo": "<owner/name or empty for the estate>", \
+"text": "<one sentence>"}, ...]}
 
 `order` lists every id you were given, most important first. `themes` is at \
 most three short phrases naming patterns across repositories, or an empty list.
 """
+
+
+# A hard ceiling, enforced here rather than trusted to the prompt. Four opinions
+# is a paragraph someone might read; twenty is a wall that buries the findings
+# above it, which is the one thing this section must never do.
+MAX_SUGGESTIONS = 4
+
+
+class SuggestionModel(BaseModel):
+    """One suggestion as the model returns it."""
+
+    text: str = Field(default="", max_length=400)
+    repo: str = Field(default="", max_length=200)
 
 
 class Triage(BaseModel):
@@ -120,21 +154,22 @@ class Triage(BaseModel):
     summary: str = Field(default="", max_length=2_000)
     order: list[str] = Field(default_factory=list)
     themes: list[str] = Field(default_factory=list, max_length=3)
+    suggestions: list[SuggestionModel] = Field(default_factory=list)
 
 
 def triage(
     findings: list[Finding],
     repos: tuple[RepoSnapshot, ...],
     client: httpx.Client | None = None,
-) -> tuple[tuple[Finding, ...], str, tuple[str, ...], TriageUsage | None]:
+) -> TriageOutcome:
     """Reorder `findings` and produce a summary, or pass them through unchanged.
 
-    Returns `(findings, summary, themes, usage)`. Never raises: a triage failure
-    costs the digest its commentary and its ordering, and must not cost the
-    digest. The findings are the product; the prose is decoration on top of them.
+    Never raises: a triage failure costs the digest its commentary, its ordering
+    and its suggestions, and must not cost the digest. The findings are the
+    product; everything else here is decoration on top of them.
     """
     if not findings:
-        return tuple(findings), "", (), None
+        return TriageOutcome(findings=tuple(findings))
 
     # Absent key means the step is off, exactly as an absent DIGEST-EMAIL-TO
     # means the mail is not sent. This is what keeps `repoagent render` working
@@ -142,18 +177,49 @@ def triage(
     api_key = optional_secret("DEEPSEEK-API-KEY")
     if not api_key:
         logger.info("no DEEPSEEK-API-KEY, skipping triage")
-        return tuple(findings), "", (), None
+        return TriageOutcome(findings=tuple(findings))
 
     try:
         reply, usage = _ask(api_key, _user_prompt(findings, repos), client=client)
     except (FetchError, ValidationError, ValueError, KeyError) as exc:
         logger.warning("triage failed, reporting findings unordered: %s", exc)
-        return tuple(findings), "", (), None
+        return TriageOutcome(findings=tuple(findings))
 
     # After the call, not before: the balance that matters is the one left for
     # next week, and asking first would report a figure already out of date.
     usage = _with_balance(usage, api_key, client=client)
-    return _apply(findings, reply), reply.summary.strip(), tuple(reply.themes), usage
+    return TriageOutcome(
+        findings=_apply(findings, reply),
+        summary=reply.summary.strip(),
+        themes=tuple(reply.themes),
+        usage=usage,
+        suggestions=_suggestions(reply, repos),
+    )
+
+
+def _suggestions(reply: Triage, repos: tuple[RepoSnapshot, ...]) -> tuple[Suggestion, ...]:
+    """The model's opinions, capped and with invented repositories dropped.
+
+    The same defence as finding ids: a repository name the model made up is
+    discarded rather than printed. A suggestion about the estate as a whole
+    carries no repository and is kept.
+    """
+    known = {repo.full_name for repo in repos}
+    kept: list[Suggestion] = []
+
+    for item in reply.suggestions:
+        text = item.text.strip()
+        if not text:
+            continue
+        repo = item.repo.strip()
+        if repo and repo not in known:
+            logger.warning("dropping suggestion about unknown repository %r", repo)
+            continue
+        kept.append(Suggestion(text=text, repo=repo))
+        if len(kept) == MAX_SUGGESTIONS:
+            break
+
+    return tuple(kept)
 
 
 def _ask(api_key: str, prompt: str, client: httpx.Client | None) -> tuple[Triage, TriageUsage]:
@@ -180,7 +246,16 @@ def _ask(api_key: str, prompt: str, client: httpx.Client | None) -> tuple[Triage
         },
         client=client,
     )
-    content = payload["choices"][0]["message"]["content"]
+    choice = payload["choices"][0]
+    # Checked before parsing, because a truncated reply is invalid JSON and the
+    # resulting validation error describes a missing brace rather than the cap
+    # that caused it.
+    if choice.get("finish_reason") == "length":
+        raise ValueError(
+            f"reply hit the {MAX_OUTPUT_TOKENS}-token cap and was truncated; "
+            "raise MAX_OUTPUT_TOKENS or ask for less"
+        )
+    content = choice["message"]["content"]
     # The model the API *actually* served, not the one asked for: `deepseek-chat`
     # is an undocumented alias that resolves to something else, and a cost
     # attributed to the wrong model is worse than none.

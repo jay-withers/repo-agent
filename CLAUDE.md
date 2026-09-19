@@ -232,7 +232,8 @@ defaults to a *healthy* repository so each test names only the thing it tests.
 Keep them pure. The moment a check fetches something it needs a transport, and
 the test suite stops being literals.
 
-**`llm.py` contributes exactly two fields: `summary` and `themes`.** It cannot
+**`llm.py` contributes `summary`, `themes` and `suggestions`, and nothing
+else.** It cannot
 add, remove or alter a finding. Three things enforce that rather than merely
 asking for it:
 
@@ -242,6 +243,28 @@ asking for it:
   invented id is dropped.
 - Findings the model omits are appended in their original order. **The set that
   goes in is the set that comes out.**
+
+### Suggestions are opinion, and kept apart at every level
+
+The advisory section exists because coded checks only ever cover what someone
+thought to write. It is separated from findings **structurally, not by wording**:
+a different field on `ScanResult`, a different section in the digest, excluded
+from every total and from the subject line, and **never written to the state
+document** — so no suggestion can ever become something the scanner remembers
+having checked. `test_suggestions_are_not_written_to_state` pins the last one.
+
+Invented repository names are dropped exactly as invented finding ids are, and
+`MAX_SUGGESTIONS` caps the list — a wall of opinion buries the findings above it,
+which is the one thing this section must not do. The prompt lists the checks that
+already exist so the model does not re-suggest them.
+
+**Reasoning tokens count against `MAX_OUTPUT_TOKENS` and are billed as output.**
+1,500 was comfortable until suggestions were added, at which point the model
+reasoned harder, hit the cap mid-JSON, and every run degraded to "triage failed"
+with a validation error about a missing brace. The cap is now 4,000 and `_ask`
+checks `finish_reason == "length"` first, so a truncation says so instead of
+looking like malformed JSON. Output roughly quadrupled in cost — still under half
+a cent.
 
 This is the market-agent lesson in `digest.py` applied structurally: given a
 count and no table, a model will accurately report from what it was given that

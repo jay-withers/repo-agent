@@ -255,3 +255,48 @@ def test_the_digest_names_what_was_resolved_and_counts_what_is_suppressed() -> N
     assert "Resolved since last run (1):" in text
     assert "jay-withers/a: no README" in text
     assert "2 finding(s) suppressed" in text
+
+
+def test_suggestions_are_never_counted_as_findings() -> None:
+    """The separation is the whole point, so it is pinned at every level."""
+    from repoagent.models import Suggestion
+
+    result = ScanResult(
+        repos=(),
+        findings=(),
+        suggestions=(Suggestion(text="Consider a shared base image.", repo="jay-withers/a"),),
+    )
+
+    # Not in the totals, and not in the subject line.
+    assert digest.subject(result) == "repo-agent — 0 repos, nothing to flag"
+    text = digest.render_text(result)
+    assert "No findings." in text
+    # Rendered, but labelled as opinion.
+    assert "Suggestions (model opinion, not checked):" in text
+    assert "jay-withers/a: Consider a shared base image." in text
+
+
+def test_suggestions_are_not_written_to_state(monkeypatch) -> None:
+    """A suggestion must never become something the scanner remembers checking."""
+    monkeypatch.setenv("DIGEST_EMAIL_TO", "someone@example.com")
+    from repoagent import settings as settings_module
+    from repoagent import state
+
+    settings_module.optional_secret.cache_clear()
+    saved: list[object] = []
+    monkeypatch.setattr(state, "save", lambda s: saved.append(s) or True)
+
+    scan.run(
+        send_email=True,
+        http=route_client(
+            {
+                **_AUTH_ROUTES,
+                "/installation/repositories": httpx.Response(200, json=_REPOS),
+                "api.resend.com": httpx.Response(200, json={"id": "mail_1"}),
+            }
+        ),
+    )
+
+    # Every id the state document carries traces to a check, never to the model.
+    stored = saved[0]
+    assert all(known.check for known in stored.findings.values())

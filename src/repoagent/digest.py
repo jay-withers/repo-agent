@@ -98,6 +98,16 @@ def render_text(result: ScanResult) -> str:
         )
         lines.append("")
 
+    # Below the findings, and labelled as opinion. The wording is load-bearing:
+    # everything above this line was established by a function someone can read,
+    # and everything in it was not.
+    if result.suggestions:
+        lines.append("Suggestions (model opinion, not checked):")
+        for item in result.suggestions:
+            where = f"{item.repo}: " if item.repo else ""
+            lines.append(f"  - {where}{item.text}")
+        lines.append("")
+
     # Named, not just counted: an exemption nobody can see is one nobody
     # revisits, and a topic added by mistake would otherwise silently drop a
     # repository out of the digest for ever.
@@ -185,6 +195,21 @@ def render_html(result: ScanResult) -> str:
         )
         resolved_html = f"<h2 style='font-size:16px'>Resolved since last run</h2><ul>{done}</ul>"
 
+    # Grey, smaller, and explicitly labelled. A reader skimming must never take
+    # one of these for a finding.
+    suggestions_html = ""
+    if result.suggestions:
+        items = "".join(
+            f"<li>{escape(item.repo) + ': ' if item.repo else ''}{escape(item.text)}</li>"
+            for item in result.suggestions
+        )
+        suggestions_html = (
+            "<h2 style='font-size:16px; color:#666'>Suggestions</h2>"
+            "<p style='color:#888; font-size:12px; margin-top:-8px'>"
+            "Model opinion. Not checked, and not counted above.</p>"
+            f"<ul style='color:#555'>{items}</ul>"
+        )
+
     ignored_html = ""
     if result.ignored:
         listed = ", ".join(f"{escape(n)} ({escape(t)})" for n, t in result.ignored)
@@ -225,6 +250,7 @@ def render_html(result: ScanResult) -> str:
         f"{summary_html}"
         f"{findings_html}"
         f"{resolved_html}"
+        f"{suggestions_html}"
         f"{suppressed_html}"
         f"{ignored_html}"
         f"<h2 style='font-size:16px'>Repositories</h2>"
