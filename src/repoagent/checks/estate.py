@@ -76,6 +76,113 @@ def not_shared_preset(snapshot: RepoSnapshot) -> list[Finding]:
     ]
 
 
+# Workflow files in this estate are written with two-space indentation, so a job
+# id sits at two spaces and its keys at four. Parsed with regexes rather than a
+# YAML dependency, for the same reason `parse_catalogue` is not an HCL parser.
+_JOB_ID = re.compile(r"^  ([A-Za-z0-9_.-]+):\s*$")
+_JOB_NAME = re.compile(r"^    name:\s*(.+?)\s*$")
+_JOB_USES = re.compile(r"^    uses:\s*\S+")
+
+
+def _producible_contexts(text: str) -> tuple[set[str], set[str]]:
+    """The contexts one workflow file can report: direct names, and caller ids.
+
+    Two sets because they are checked differently. A normal job reports its
+    `name`, or its id where it has none. A job that calls a reusable workflow
+    reports one context per job *in that workflow*, namespaced
+    `<caller job id> / <reusable job name>` — and the second half lives in
+    another repository, so only the caller id can be checked from here.
+    """
+    direct: set[str] = set()
+    callers: set[str] = set()
+    in_jobs = False
+    job_id: str | None = None
+    job_name: str | None = None
+    calls = False
+
+    def close() -> None:
+        """Record the job just finished, now that its keys have been seen."""
+        if job_id is None:
+            return
+        if calls:
+            callers.add(job_id)
+        else:
+            direct.add(job_name or job_id)
+
+    for line in text.splitlines():
+        if not in_jobs:
+            in_jobs = line.rstrip() == "jobs:"
+            continue
+        match = _JOB_ID.match(line)
+        if match:
+            close()
+            job_id, job_name, calls = match.group(1), None, False
+            continue
+        if job_id is None:
+            continue
+        if _JOB_USES.match(line):
+            calls = True
+        elif name := _JOB_NAME.match(line):
+            job_name = name.group(1).strip("\"'")
+    close()
+    return direct, callers
+
+
+def unreportable_required_check(snapshot: RepoSnapshot) -> list[Finding]:
+    """A required status check that no workflow in the repository can report.
+
+    The worst failure mode branch protection has, and a silent one: an absent
+    check never fails a pull request, it leaves it *pending*. Nothing is red,
+    nothing is merged, and the only way anything lands is a ruleset bypass —
+    which is how azure-landingzone required `terraform / Terraform` for weeks
+    while its workflows reported `ci-terraform`, and why its Renovate backlog
+    reached six.
+
+    Deliberately conservative. For a namespaced context only the caller job id
+    is checked, because the job name after the slash is defined in whichever
+    repository owns the reusable workflow; this reports a context whose caller
+    does not exist at all, not one whose far half has been renamed.
+    """
+    required = snapshot.required_checks
+    # None means the catalogue could not be read, or does not declare this
+    # repository — the same tri-state as `in_catalogue`, and the same reason.
+    if not required or not snapshot.workflows:
+        return []
+
+    direct: set[str] = set()
+    callers: set[str] = set()
+    for workflow in snapshot.workflows:
+        workflow_direct, workflow_callers = _producible_contexts(workflow.text)
+        direct |= workflow_direct
+        callers |= workflow_callers
+
+    missing = [
+        context
+        for context in required
+        if context not in direct
+        and not (" / " in context and context.split(" / ", 1)[0] in callers)
+    ]
+    if not missing:
+        return []
+
+    listed = ", ".join(f"`{context}`" for context in missing)
+    return [
+        Finding(
+            repo=snapshot.full_name,
+            check="estate.unreportable_required_check",
+            severity="high",
+            title=f"{len(missing)} required status check(s) nothing reports",
+            detail=(
+                f"{listed} required by the github-repos catalogue, and no workflow in "
+                "this repository produces that context. A required check that never "
+                "reports leaves every pull request pending rather than failing it, so "
+                "nothing merges except by bypassing the ruleset."
+            ),
+            evidence_url=f"{snapshot.url}/tree/{snapshot.default_branch}/.github/workflows",
+        )
+    ]
+
+
 # Every platform that runs Terraform across this estate: CI is amd64, the dev
 # containers and laptops are arm64. CLAUDE.md's remedy locks three —
 # linux_amd64, linux_arm64, darwin_arm64 — so three is what a complete lock has.

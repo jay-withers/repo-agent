@@ -176,6 +176,11 @@ def _snapshots(
         replace(
             parse.merge_detail(repo, details.get(repo.full_name)),
             in_catalogue=None if declared is None else repo.name in declared,
+            required_checks=(
+                None
+                if declared is None or repo.name not in declared
+                else tuple(sorted(declared[repo.name]))
+            ),
         )
         for repo in repos
     )

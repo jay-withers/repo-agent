@@ -209,12 +209,12 @@ def repo_details(
 # Configurable rather than hard-coded so this is not silently wrong for anyone
 # whose catalogue lives elsewhere, and so an empty setting switches the check off
 # rather than producing a finding against every repository at once.
-def catalogue(client: httpx.Client | None = None) -> frozenset[str] | None:
-    """Every repository name `github-repos` declares, or None if unreadable.
+def catalogue(client: httpx.Client | None = None) -> dict[str, frozenset[str]] | None:
+    """Every repository `github-repos` declares and the checks it requires.
 
     **None and empty mean different things.** None is "the catalogue could not be
     read", which must never render as "every repository is unmanaged"; an empty
-    set is a catalogue that genuinely declares nothing.
+    mapping is a catalogue that genuinely declares nothing.
     """
     cfg = settings()
     if not cfg.catalogue_repo:
@@ -245,13 +245,23 @@ def catalogue(client: httpx.Client | None = None) -> frozenset[str] | None:
         logger.warning("no catalogue file at %s:%s", cfg.catalogue_repo, cfg.catalogue_path)
         return None
 
-    names = parse_catalogue(text)
-    logger.info("catalogue declares %d repositories", len(names))
-    return names
+    entries = parse_catalogue_entries(text)
+    logger.info("catalogue declares %d repositories", len(entries))
+    return entries
 
 
 def parse_catalogue(text: str) -> frozenset[str]:
-    """The repository names declared in a `repos = { ... }` tfvars block.
+    """The repository names declared in a `repos = { ... }` tfvars block."""
+    return frozenset(parse_catalogue_entries(text))
+
+
+def parse_catalogue_entries(text: str) -> dict[str, frozenset[str]]:
+    """Each declared repository, mapped to the status checks it requires.
+
+    The names are the reason this exists; the contexts ride along because they
+    are in the same block and reading the file twice would be the only
+    alternative. A repository declaring none maps to an empty set, which is
+    different from one that is absent entirely.
 
     A brace-depth scan rather than a regex over the whole file, because the
     values contain nested blocks — `required_status_checks = [{ context = ... }]`
@@ -262,7 +272,8 @@ def parse_catalogue(text: str) -> frozenset[str]:
     dependency for one check. This reads what the catalogue actually looks like
     and ignores anything it does not recognise.
     """
-    names: set[str] = set()
+    entries: dict[str, set[str]] = {}
+    current: str | None = None
     depth = 0
     in_repos = False
 
@@ -280,10 +291,19 @@ def parse_catalogue(text: str) -> frozenset[str]:
         # A quoted key opening a block, directly inside `repos`.
         match = re.match(r'^"([^"]+)"\s*=\s*\{\s*$', line)
         if depth == 1 and match:
-            names.add(match.group(1))
+            current = match.group(1)
+            entries[current] = set()
+        elif current is not None:
+            # `{ context = "pre-commit / Pre-commit" },` — one per line in the
+            # catalogue, and nothing else in a repository block uses `context`.
+            context = re.search(r'\bcontext\s*=\s*"([^"]+)"', line)
+            if context:
+                entries[current].add(context.group(1))
 
         depth += line.count("{") - line.count("}")
+        if depth <= 1:
+            current = None
         if depth <= 0:
             break
 
-    return frozenset(names)
+    return {name: frozenset(contexts) for name, contexts in entries.items()}

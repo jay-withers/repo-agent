@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from repoagent.checks import estate, workflows
-from repoagent.github.client import parse_catalogue
+from repoagent.github.client import parse_catalogue, parse_catalogue_entries
 from tests.factories import HEALTHY_TF_LOCK, snapshot, workflow
 from tests.helpers import route_client
 
@@ -45,6 +45,22 @@ def test_the_catalogue_yields_only_top_level_repository_keys() -> None:
 def test_nested_blocks_are_not_mistaken_for_repositories() -> None:
     """`required_status_checks = [{ context = ... }]` must not become a repo."""
     assert "context" not in parse_catalogue(CATALOGUE)
+
+
+def test_the_catalogue_carries_each_repositorys_required_contexts() -> None:
+    entries = parse_catalogue_entries(CATALOGUE)
+
+    assert entries["azure-landingzone"] == frozenset(
+        {"pre-commit / Pre-commit", "terraform / Terraform"}
+    )
+
+
+def test_a_repository_requiring_no_checks_is_empty_not_absent() -> None:
+    """Declaring no required checks is a different fact from not being declared."""
+    entries = parse_catalogue_entries(CATALOGUE)
+
+    assert entries["repo-agent"] == frozenset()
+    assert "not-a-repo" not in entries
 
 
 def test_a_catalogue_with_no_repos_block_yields_nothing() -> None:
@@ -93,6 +109,106 @@ def test_extending_the_shared_preset_passes() -> None:
 def test_no_renovate_config_is_a_different_findings_problem() -> None:
     """`renovate.missing_config` owns that; this check must not double-report."""
     assert estate.not_shared_preset(snapshot(renovate_config=None)) == []
+
+
+# --- required checks nothing reports ----------------------------------------
+
+# The shape azure-landingzone had: a local gate job reporting `ci-terraform`,
+# while the catalogue required `terraform / Terraform`.
+LOCAL_GATE_WORKFLOW = """\
+name: ci-terraform
+on: [pull_request]
+jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo hello
+  ci-terraform:
+    needs: [changes]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo hello
+"""
+
+# The shape it has now: a job calling the reusable workflow, whose own gate job
+# makes the context `terraform / Terraform`.
+CALLER_WORKFLOW = """\
+name: ci-terraform
+on: [pull_request]
+jobs:
+  terraform:
+    permissions:
+      contents: read
+    uses: jay-withers/workflows/terraform.yml@2d4b1e0f3a5c7d9e1f2a3b4c5d6e7f8091a2b3c4 # v1.4.1
+  terraform-plan:
+    needs: terraform
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo hello
+"""
+
+
+def test_a_required_context_no_workflow_can_report_is_flagged() -> None:
+    findings = estate.unreportable_required_check(
+        snapshot(
+            workflows=(workflow(name="ci-terraform.yml", text=LOCAL_GATE_WORKFLOW),),
+            required_checks=("terraform / Terraform",),
+        )
+    )
+
+    assert len(findings) == 1
+    assert findings[0].severity == "high"
+    assert "terraform / Terraform" in findings[0].detail
+
+
+def test_a_reusable_workflow_call_satisfies_its_namespaced_context() -> None:
+    """Only the caller job id can be checked — the name after the slash is
+    defined in whichever repository owns the reusable workflow."""
+    assert (
+        estate.unreportable_required_check(
+            snapshot(
+                workflows=(workflow(name="ci-terraform.yml", text=CALLER_WORKFLOW),),
+                required_checks=("terraform / Terraform", "terraform-plan"),
+            )
+        )
+        == []
+    )
+
+
+def test_a_jobs_name_is_its_context_where_it_has_one() -> None:
+    named = """\
+name: ci
+on: [pull_request]
+jobs:
+  build_and_test:
+    name: Test
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo hello
+"""
+    assert (
+        estate.unreportable_required_check(
+            snapshot(workflows=(workflow(name="ci.yml", text=named),), required_checks=("Test",))
+        )
+        == []
+    )
+
+
+def test_a_catalogue_that_could_not_be_read_flags_nothing() -> None:
+    """The same tri-state as `in_catalogue`, for the same reason."""
+    assert estate.unreportable_required_check(snapshot(required_checks=None)) == []
+
+
+def test_a_repository_with_no_workflows_at_all_flags_nothing() -> None:
+    """A failed detail query leaves every snapshot workflow-less, and must not
+    report the whole estate as misconfigured — `hygiene.no_ci` owns that fact."""
+    assert (
+        estate.unreportable_required_check(
+            snapshot(workflows=(), required_checks=("terraform / Terraform",))
+        )
+        == []
+    )
 
 
 # --- terraform lock ---------------------------------------------------------

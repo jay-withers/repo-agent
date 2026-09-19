@@ -89,6 +89,11 @@ class RepoSnapshot:
     # Whether `github-repos` declares this repository. None when the
     # catalogue could not be read, which must not read as "unmanaged".
     in_catalogue: bool | None = None
+    # The status check contexts the catalogue requires of this repository. None
+    # when the catalogue could not be read *or* does not declare this repo at
+    # all — in both cases there is nothing to hold its workflows to, and
+    # `estate.unmanaged` already reports the second.
+    required_checks: tuple[str, ...] | None = None
     open_prs: tuple[PullRequest, ...] = ()
     last_release: str | None = None
     last_release_at: datetime | None = None

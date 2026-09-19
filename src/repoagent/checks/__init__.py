@@ -32,6 +32,10 @@ ALL: tuple[Check, ...] = (
     # Estate before hygiene: a repository outside the catalogue has nothing
     # enforcing anything on it, which outranks every cosmetic finding below.
     estate.unmanaged,
+    # Above the lock check for the same reason `unmanaged` is above everything:
+    # a required check nothing reports blocks every pull request in the
+    # repository, which outranks anything wrong inside one of them.
+    estate.unreportable_required_check,
     estate.incomplete_terraform_lock,
     estate.not_shared_preset,
     workflows.unpinned_actions,
