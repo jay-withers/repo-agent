@@ -17,6 +17,8 @@ dependencies = [
   "python-dotenv>=1.0",
   "azure-identity>=1.19",
   "azure-keyvault-secrets>=4.9",
+  # The scan's history: one JSON document, read and written whole once a week.
+  "azure-storage-blob>=12.23",
   "httpx>=0.28",
   # GitHub App authentication signs an RS256 JWT, which needs the crypto extra —
   # PyJWT alone ships only the HMAC algorithms and fails at runtime with

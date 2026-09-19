@@ -73,6 +73,14 @@ class Settings(BaseSettings):
     # this job would find out on a Monday.
     deepseek_model: str = "deepseek-flash"
 
+    # Blob container holding the scan's history. Empty switches history off
+    # entirely — every finding then reports as new, which is the right default
+    # locally and what keeps `make run` working with no storage account.
+    #
+    # Not a secret: it is a URL, and reaching it still needs the managed
+    # identity's RBAC grant on the container.
+    state_container_url: str = ""
+
     # Resend refuses a `from` on an unverified domain, so the default is their
     # shared testing sender — which only delivers to the address that owns the
     # Resend account. A real domain replaces it later.

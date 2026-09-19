@@ -1,4 +1,10 @@
-"""One entrypoint, two commands — `repoagent scan|render`.
+"""One entrypoint — `repoagent scan|render|state|suppress|unsuppress`.
+
+`scan` and `render` are the workload; the other three are operator commands for
+the state document, and exist because a suppression nobody can add, list or
+remove is a feature that does not work. They run against the real blob, so they
+need `STATE_CONTAINER_URL` and a credential with `Storage Blob Data Contributor`
+on the container — which whoever applied the Terraform already has.
 
 Both workloads share one image and differ only by the container's `args`. Note
 Terraform deliberately sets **no** `command`: the Dockerfile's `ENTRYPOINT` names
@@ -62,6 +68,21 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("scan", help="scan every repository and email the digest")
     sub.add_parser("render", help="scan and print the digest, sending nothing")
+    sub.add_parser("state", help="print what the scan remembers between runs")
+
+    hush = sub.add_parser("suppress", help="stop reporting one finding, with a reason")
+    hush.add_argument("finding_id", help="the id shown by `repoagent state`")
+    # Required, not optional. A suppression without a reason is indistinguishable
+    # in six months from a bug, and the whole point is to record the decision.
+    hush.add_argument("--reason", required=True, help="why this is acceptable")
+    hush.add_argument(
+        "--until",
+        metavar="YYYY-MM-DD",
+        help="expire the suppression on this date; omit for indefinitely",
+    )
+
+    speak = sub.add_parser("unsuppress", help="start reporting a finding again")
+    speak.add_argument("finding_id", help="the id shown by `repoagent state`")
 
     args = parser.parse_args(argv)
 
@@ -75,6 +96,9 @@ def main(argv: list[str] | None = None) -> int:
         # Imported lazily so that `--help` and a failed argument parse cost
         # nothing, and so an import error in the job surfaces against the
         # command that needed it.
+        if args.command in {"state", "suppress", "unsuppress"}:
+            return _state_command(args)
+
         from .jobs import scan
 
         if args.command == "scan":
@@ -94,6 +118,62 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         telemetry.flush()
 
+    return 0
+
+
+def _state_command(args: argparse.Namespace) -> int:
+    """The operator commands, which read and write the state document directly.
+
+    Unlike the scan, these **report failure**. A `save` that silently did nothing
+    would leave someone believing they had suppressed a finding, and they would
+    only find out next Monday.
+    """
+    from dataclasses import replace
+
+    from . import state as state_module
+
+    logger = logging.getLogger("repoagent.state")
+    store = state_module.load()
+
+    if args.command == "state":
+        print(store.to_json())
+        return 0
+
+    if args.command == "unsuppress":
+        if args.finding_id not in store.suppressed:
+            logger.error("%s is not suppressed", args.finding_id)
+            return 1
+        remaining = {k: v for k, v in store.suppressed.items() if k != args.finding_id}
+        updated = replace(store, suppressed=remaining)
+    else:
+        from datetime import UTC, date, datetime
+
+        if args.until:
+            try:
+                date.fromisoformat(args.until)
+            except ValueError:
+                logger.error("--until %r is not a YYYY-MM-DD date", args.until)
+                return 1
+        # Warn rather than refuse on an unknown id: a finding that is currently
+        # resolved may come back, and pre-suppressing one is legitimate.
+        if args.finding_id not in store.findings:
+            logger.warning("%s is not a finding this run knows about", args.finding_id)
+        updated = replace(
+            store,
+            suppressed={
+                **store.suppressed,
+                args.finding_id: state_module.Suppression(
+                    reason=args.reason,
+                    until=args.until,
+                    added=datetime.now(UTC).date().isoformat(),
+                ),
+            },
+        )
+
+    if not state_module.save(updated):
+        logger.error("could not write the state document; nothing was changed")
+        return 1
+    logger.info("state updated: %s %sd", args.finding_id, args.command)
     return 0
 
 

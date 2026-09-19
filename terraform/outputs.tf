@@ -20,3 +20,10 @@ output "identity_client_id" {
   description = "Client ID of the workload identity, which the container receives as `AZURE_CLIENT_ID` and uses to read Key Vault."
   value       = azurerm_user_assigned_identity.this.client_id
 }
+
+# What `make deploy` pushes onto the running revision, because `common_env` sits
+# under `ignore_changes` and Terraform will therefore never update it itself.
+output "state_container_url" {
+  description = "Blob container holding the scan's history, for `make deploy` and for `repoagent suppress` run locally."
+  value       = "${azurerm_storage_account.state.primary_blob_endpoint}${azurerm_storage_container.state.name}"
+}

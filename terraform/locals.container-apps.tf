@@ -1,4 +1,8 @@
 locals {
+  # Assembled by hand: `azurerm_storage_container` exports no Resource Manager
+  # id, and its `id` is the data-plane URL, which a role assignment rejects.
+  state_container_scope = "${azurerm_storage_account.state.id}/blobServices/default/containers/${azurerm_storage_container.state.name}"
+
   image = "${var.image_registry}/repoagent:${var.image_tag}"
 
   # The smallest Container Apps allows. This job lists repositories and sends an
@@ -19,5 +23,8 @@ locals {
     # digest is read a week later and "which code ran" should not need
     # archaeology.
     IMAGE_TAG = var.image_tag
+    # Where the run reads and writes its history. Not a secret — it is a URL,
+    # and reaching it still needs the managed identity's RBAC grant.
+    STATE_CONTAINER_URL = "${azurerm_storage_account.state.primary_blob_endpoint}${azurerm_storage_container.state.name}"
   }
 }

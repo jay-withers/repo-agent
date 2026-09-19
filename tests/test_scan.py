@@ -109,8 +109,12 @@ def test_digest_reports_counts_from_the_data_not_from_prose() -> None:
     assert "Scanned 2 repositories" in digest.render_text(result)
     # The subject's figures are both derived from the result, never written by a
     # model — which is the property this test exists to pin.
+    # With no state configured every finding is new, so the subject says so —
+    # and both figures are still derived from the result, never written by a
+    # model, which is the property this test exists to pin.
+    new = sum(1 for f in result.findings if f.is_new)
     assert digest.subject(result) == (
-        f"repo-agent — {len(result.findings)} findings across {len(result.repos)} repos"
+        f"repo-agent — {len(result.findings)} findings across {len(result.repos)} repos ({new} new)"
     )
     # The repository with no description is flagged as such in the listing.
     assert "no description" in digest.render_text(result)
@@ -179,3 +183,75 @@ def test_no_footer_when_triage_did_not_run() -> None:
     result = ScanResult(repos=(), image_tag="v0.1.0", usage=None)
 
     assert "triage" not in digest.render_text(result)
+
+
+def test_render_does_not_save_state(monkeypatch) -> None:
+    """Running `make run` twice must not rob Monday's email of its deltas."""
+    from repoagent import state
+
+    saved: list[object] = []
+    monkeypatch.setattr(state, "save", lambda s: saved.append(s) or True)
+
+    scan.run(
+        send_email=False,
+        http=route_client(
+            {**_AUTH_ROUTES, "/installation/repositories": httpx.Response(200, json=_REPOS)}
+        ),
+    )
+
+    assert saved == []
+
+
+def test_a_skipped_email_does_not_save_state(monkeypatch) -> None:
+    """A run that reported nothing must not record its findings as seen."""
+    from repoagent import state
+
+    saved: list[object] = []
+    monkeypatch.setattr(state, "save", lambda s: saved.append(s) or True)
+
+    # No DIGEST_EMAIL_TO, so mailer returns `skipped`.
+    scan.run(
+        send_email=True,
+        http=route_client(
+            {**_AUTH_ROUTES, "/installation/repositories": httpx.Response(200, json=_REPOS)}
+        ),
+    )
+
+    assert saved == []
+
+
+def test_a_sent_email_saves_state(monkeypatch) -> None:
+    monkeypatch.setenv("DIGEST_EMAIL_TO", "someone@example.com")
+    from repoagent import settings as settings_module
+    from repoagent import state
+
+    settings_module.optional_secret.cache_clear()
+    saved: list[object] = []
+    monkeypatch.setattr(state, "save", lambda s: saved.append(s) or True)
+
+    scan.run(
+        send_email=True,
+        http=route_client(
+            {
+                **_AUTH_ROUTES,
+                "/installation/repositories": httpx.Response(200, json=_REPOS),
+                "api.resend.com": httpx.Response(200, json={"id": "mail_1"}),
+            }
+        ),
+    )
+
+    assert len(saved) == 1
+
+
+def test_the_digest_names_what_was_resolved_and_counts_what_is_suppressed() -> None:
+    result = ScanResult(
+        repos=(),
+        image_tag="v0.1.0",
+        resolved=(("jay-withers/a", "no README"),),
+        suppressed_count=2,
+    )
+    text = digest.render_text(result)
+
+    assert "Resolved since last run (1):" in text
+    assert "jay-withers/a: no README" in text
+    assert "2 finding(s) suppressed" in text

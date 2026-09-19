@@ -40,7 +40,11 @@ def subject(result: ScanResult) -> str:
     findings = len(result.findings)
     if findings == 0:
         return f"repo-agent — {repos} repos, nothing to flag"
-    return f"repo-agent — {findings} finding{'s' if findings != 1 else ''} across {repos} repos"
+    subject = f"repo-agent — {findings} finding{'s' if findings != 1 else ''} across {repos} repos"
+    # The count of *new* things is what decides whether this gets opened, and an
+    # inbox shows perhaps forty characters, so it goes in only when non-zero.
+    new = sum(1 for f in result.findings if f.is_new)
+    return f"{subject} ({new} new)" if new else subject
 
 
 def render_text(result: ScanResult) -> str:
@@ -62,17 +66,36 @@ def render_text(result: ScanResult) -> str:
         lines.append("")
 
     if result.findings:
-        lines.append(f"{len(result.findings)} finding(s):")
+        new = sum(1 for f in result.findings if f.is_new)
+        headline = f"{len(result.findings)} finding(s)"
+        if new:
+            headline += f", {new} new since last run"
+        lines.append(f"{headline}:")
         lines.append("")
         for finding in result.findings:
             age = f" ({finding.age_days}d)" if finding.age_days is not None else ""
-            lines.append(f"  [{finding.severity}] {finding.repo}: {finding.title}{age}")
+            marker = " [NEW]" if finding.is_new else ""
+            lines.append(f"  [{finding.severity}] {finding.repo}: {finding.title}{age}{marker}")
             lines.append(f"      {finding.detail}")
             if finding.evidence_url:
                 lines.append(f"      {finding.evidence_url}")
         lines.append("")
     else:
         lines.append("No findings.")
+        lines.append("")
+
+    # Resolved before the repository list, because a fixed thing is the most
+    # encouraging line in the email and it belongs where it will be read.
+    if result.resolved:
+        lines.append(f"Resolved since last run ({len(result.resolved)}):")
+        for repo, title in result.resolved:
+            lines.append(f"  {repo}: {title}")
+        lines.append("")
+
+    if result.suppressed_count:
+        lines.append(
+            f"{result.suppressed_count} finding(s) suppressed. `repoagent state` lists them."
+        )
         lines.append("")
 
     lines.append("Repositories:")
@@ -147,10 +170,30 @@ def render_html(result: ScanResult) -> str:
         )
         summary_html += f"<p style='margin:12px 0'>{chips}</p>"
 
+    resolved_html = ""
+    if result.resolved:
+        done = "".join(
+            f"<li>{escape(repo)}: {escape(title)}</li>" for repo, title in result.resolved
+        )
+        resolved_html = f"<h2 style='font-size:16px'>Resolved since last run</h2><ul>{done}</ul>"
+
+    suppressed_html = ""
+    if result.suppressed_count:
+        suppressed_html = (
+            f"<p style='color:#888; font-size:12px'>{result.suppressed_count} finding(s) "
+            f"suppressed — <code>repoagent state</code> lists them.</p>"
+        )
+
     findings_html = ""
     if result.findings:
         items = "".join(
             f"<li><strong>{escape(f.repo)}</strong>: {escape(f.title)}"
+            + (
+                " <span style='background:#e8f4ff; color:#06c; border-radius:3px; "
+                "padding:1px 5px; font-size:11px'>new</span>"
+                if f.is_new
+                else ""
+            )
             + (
                 f" <span style='color:#666'>({f.age_days}d)</span>"
                 if f.age_days is not None
@@ -159,13 +202,17 @@ def render_html(result: ScanResult) -> str:
             + f"<br><span style='color:#444'>{escape(f.detail)}</span></li>"
             for f in result.findings
         )
-        findings_html = f"<h2 style='font-size:16px'>Findings</h2><ul>{items}</ul>"
+        new = sum(1 for f in result.findings if f.is_new)
+        heading = "Findings" + (f" — {new} new since last run" if new else "")
+        findings_html = f"<h2 style='font-size:16px'>{escape(heading)}</h2><ul>{items}</ul>"
 
     return (
         f'<div style="{_STYLE}">'
         f"<p>Scanned <strong>{len(result.repos)}</strong> repositories.</p>"
         f"{summary_html}"
         f"{findings_html}"
+        f"{resolved_html}"
+        f"{suppressed_html}"
         f"<h2 style='font-size:16px'>Repositories</h2>"
         f"<table style='border-collapse:collapse'>{''.join(rows)}</table>"
         f"<p style='color:#888; font-size:12px'>repo-agent {escape(result.image_tag)}"
