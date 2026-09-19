@@ -1,16 +1,24 @@
 """Turning a scan into an email.
 
-**Every figure here is computed, never written by a model.** When the LLM
-triage step lands it will add commentary and a priority ordering, and it will be
-told the tables are already above its text and must not be restated. That rule
-exists because market-agent's summary job learned it the hard way: given a
-reconciliation count and no trades table, the model accurately reported from
-what it had been given that nothing had happened on a day three trades executed.
-The defence is not a better prompt, it is never letting the model near a number
-that gets reported.
+**Every figure here is computed, never written by a model.** The triage step in
+`llm.py` contributes exactly two fields — `summary` and `themes` — and is told
+the tables are already above its text and must not be restated. Every count,
+every repository name and every finding on this page comes from the checks.
+
+That rule exists because market-agent's summary job learned it the hard way:
+given a reconciliation count and no trades table, the model accurately reported
+from what it had been given that nothing had happened on a day three trades
+executed. The defence is not a better prompt, it is never letting the model near
+a number that gets reported.
+
+Model output is escaped on the way into the HTML, along with everything else
+GitHub supplies. A repository description containing a `<` was always able to
+break the layout; a model writing one is merely likelier.
 """
 
 from __future__ import annotations
+
+from html import escape
 
 from .models import ScanResult
 
@@ -41,6 +49,17 @@ def render_text(result: ScanResult) -> str:
         f"Scanned {len(result.repos)} repositories.",
         "",
     ]
+
+    # Below the count, above the findings: the model's paragraph is context for
+    # the list, so it reads before it. It is rendered only if it exists — an
+    # absent summary means triage was off or failed, which is not worth a line
+    # saying so.
+    if result.summary:
+        lines.append(result.summary)
+        lines.append("")
+    if result.themes:
+        lines.append(f"Themes: {'; '.join(result.themes)}")
+        lines.append("")
 
     if result.findings:
         lines.append(f"{len(result.findings)} finding(s):")
@@ -85,20 +104,38 @@ def render_html(result: ScanResult) -> str:
             flags.append("no description")
         rows.append(
             f"<tr><td style='padding:4px 12px 4px 0'>"
-            f"<a href='{repo.url}'>{repo.full_name}</a></td>"
-            f"<td style='padding:4px 0; color:#666'>{', '.join(flags)}</td></tr>"
+            f"<a href='{escape(repo.url, quote=True)}'>{escape(repo.full_name)}</a></td>"
+            f"<td style='padding:4px 0; color:#666'>{escape(', '.join(flags))}</td></tr>"
         )
+
+    # Italic and grey, so it reads as commentary rather than as a finding. The
+    # distinction matters: everything else in this email is machine-established
+    # and this paragraph is not.
+    summary_html = ""
+    if result.summary:
+        summary_html = (
+            f"<p style='color:#333; font-style:italic; "
+            f"border-left:3px solid #ddd; padding-left:12px; margin:16px 0'>"
+            f"{escape(result.summary)}</p>"
+        )
+    if result.themes:
+        chips = " ".join(
+            f"<span style='background:#f0f0f0; border-radius:3px; padding:2px 6px; "
+            f"font-size:12px; color:#444'>{escape(theme)}</span>"
+            for theme in result.themes
+        )
+        summary_html += f"<p style='margin:12px 0'>{chips}</p>"
 
     findings_html = ""
     if result.findings:
         items = "".join(
-            f"<li><strong>{f.repo}</strong>: {f.title}"
+            f"<li><strong>{escape(f.repo)}</strong>: {escape(f.title)}"
             + (
                 f" <span style='color:#666'>({f.age_days}d)</span>"
                 if f.age_days is not None
                 else ""
             )
-            + f"<br><span style='color:#444'>{f.detail}</span></li>"
+            + f"<br><span style='color:#444'>{escape(f.detail)}</span></li>"
             for f in result.findings
         )
         findings_html = f"<h2 style='font-size:16px'>Findings</h2><ul>{items}</ul>"
@@ -106,6 +143,7 @@ def render_html(result: ScanResult) -> str:
     return (
         f'<div style="{_STYLE}">'
         f"<p>Scanned <strong>{len(result.repos)}</strong> repositories.</p>"
+        f"{summary_html}"
         f"{findings_html}"
         f"<h2 style='font-size:16px'>Repositories</h2>"
         f"<table style='border-collapse:collapse'>{''.join(rows)}</table>"

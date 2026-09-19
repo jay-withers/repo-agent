@@ -10,11 +10,17 @@ working, and emails a weekly digest on Monday mornings.
 
 `README.md` covers *why* and how to run it. This file covers the traps.
 
-**Status: walking skeleton.** It authenticates, lists every repository and
-emails a digest. The checks themselves are not written yet — `scan.run()`
-already returns a `findings` tuple and `digest.py` already renders one, so they
-land without changing the shape of anything. There is no LLM call yet either;
-`ANTHROPIC-API-KEY` is planned, not read.
+**Status: working.** It authenticates, lists every repository, fetches detail
+for each with one batched GraphQL query, runs deterministic checks, asks
+DeepSeek to triage the results, and emails a digest.
+
+**Persistence is the next thing.** Nothing is stored between runs, so the
+digest cannot say what is new since last week and a finding with no GitHub
+timestamp has no age. `Finding.id` exists for exactly this. The intended shape
+is one JSON blob in an Azure Storage account — `{finding_id: first_seen}` —
+read at the top of `scan.run()` and written at the end, authenticated with the
+managed identity so it adds no new secret. Not Postgres: market-agent has one,
+this does not need one to store a few hundred rows.
 
 ## The two-repo split
 
@@ -88,11 +94,54 @@ exists. Never commit a filled-in `.env` — `.gitignore` excludes `.env` and
 `.env.*` and lets the template through.
 
 Secrets in use: `GITHUB-APP-ID`, `GITHUB-APP-PRIVATE-KEY`, `DIGEST-EMAIL-TO`,
-`RESEND-API-KEY`. **`DIGEST-EMAIL-TO` must be plain ASCII** — Resend rejects a
+`RESEND-API-KEY`, `DEEPSEEK-API-KEY`.
+
+`DEEPSEEK-API-KEY` is read with `optional_secret()`, not `secret()`, so its
+absence switches triage off rather than failing the run — the same pattern as
+`DIGEST-EMAIL-TO`. That is what keeps `make run` working with no DeepSeek
+account, and it means adding the key needs no redeploy. **`DIGEST-EMAIL-TO` must be plain ASCII** — Resend rejects a
 `to` containing anything else with a 422, and market-agent lost a day's summary
 to a value pasted with curly quotes, which are invisible in
 `az keyvault secret show` output. Read the codepoints (`| cat -A`) when a send
 fails on the address.
+
+## The checks, and what the model is allowed to do
+
+**Checks are pure `(RepoSnapshot) -> list[Finding]` functions in `checks/`, and
+they establish every fact the digest reports.** They do no I/O, so they are
+tested by constructing a snapshot directly — see `tests/factories.py`, which
+defaults to a *healthy* repository so each test names only the thing it tests.
+Keep them pure. The moment a check fetches something it needs a transport, and
+the test suite stops being literals.
+
+**`llm.py` contributes exactly two fields: `summary` and `themes`.** It cannot
+add, remove or alter a finding. Three things enforce that rather than merely
+asking for it:
+
+- The reply is validated against a Pydantic schema, so malformed output raises
+  instead of being pasted into an email.
+- Returned finding ids are intersected with the ids that were sent, so an
+  invented id is dropped.
+- Findings the model omits are appended in their original order. **The set that
+  goes in is the set that comes out.**
+
+This is the market-agent lesson in `digest.py` applied structurally: given a
+count and no table, a model will accurately report from what it was given that
+nothing happened on a day three trades executed. The defence is not a better
+prompt. Triage failure is caught and logged — the digest goes out unordered
+with no commentary, because the findings are the product and the prose is
+decoration.
+
+**DeepSeek, not Anthropic.** The API is OpenAI-compatible, so the integration
+is one `fetch.post_json` and the SDK this repo once planned for was never
+added. Two consequences worth holding on to: DeepSeek is China-hosted and its
+terms permit training on inputs, so `llm.PROMPT_FILE_BUDGET` is a privacy
+control as much as a cost one; and only repositories that actually have a
+finding get context in the prompt.
+
+`deepseek-chat` (V3) rather than `deepseek-reasoner` (R1) — ordering a list
+someone else established is not a reasoning problem, and R1's thinking tokens
+bill as output.
 
 ## GitHub API
 
@@ -105,6 +154,22 @@ deliberate divergence from market-agent's copy.
 Everything needed comes from `GET /installation/repositories` plus a batched
 GraphQL query. Requests are sequential on one client; secondary limits are
 about burst and concurrency.
+
+**The detail query batches ten repositories per request, not all of them.**
+GraphQL costs are scored on the *potential* node count of the whole document,
+so one query aliasing every repository fails outright on a large installation
+rather than degrading. Repository names go in as **variables**, never
+interpolated: `") { evil }` is a legal GitHub repository name.
+
+**`branchProtectionRules` and `vulnerabilityAlerts` are deliberately absent**
+from that query. Both need permissions beyond the App's read-only
+metadata/contents/pull-requests set, and GraphQL reports a permission failure
+as an `errors` entry — which `fetch.graphql` turns into a `FetchError` that
+fails the whole batch, not just the field. Adding either means widening the App
+first.
+
+A failed detail query **degrades** the run rather than ending it: the REST list
+alone still reports every repository and every hygiene finding.
 
 **GitHub App auth is hand-rolled on `PyJWT[crypto]`.** Sign an RS256 JWT
 (`iss` = app id, `iat` backdated 60s for clock skew, `exp` ≤ 600s or GitHub
@@ -142,9 +207,17 @@ import as `tests.helpers` — a bare `from conftest import ...` does not resolve
 **The test RSA key is generated in-process with `cryptography`.** Never commit
 a PEM, even a throwaway, to a public repo. Reset `auth._cached` between tests.
 
-When the checks land they are pure `(RepoSnapshot) -> list[Finding]` functions,
-so they are tested by constructing a snapshot directly with no HTTP anywhere
-near the test. Keep them that way.
+The checks are pure `(RepoSnapshot) -> list[Finding]` functions, tested by
+constructing a snapshot directly with no HTTP anywhere near the test. Keep them
+that way.
+
+`tests/factories.py` holds the snapshot builders, **not `tests/helpers.py`** —
+that one is copied verbatim from market-agent and is re-copied rather than
+diverged, so anything specific to this project's models belongs in factories.
+
+`conftest.py` **deletes `DEEPSEEK_API_KEY`** alongside the others, so triage is
+off unless a test switches it on. A test that enabled it accidentally would
+reach `api.deepseek.com` for real.
 
 ## Docker
 

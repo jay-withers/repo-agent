@@ -5,8 +5,9 @@ description = "Scans GitHub repositories for improvements and checks Renovate is
 requires-python = ">=3.12"
 
 # One package, one image, two entrypoints (scan, render). Dependencies are added
-# as the modules that need them land rather than declared up front — the
-# Anthropic SDK arrives with the triage step, which does not exist yet.
+# as the modules that need them land rather than declared up front. The triage
+# step has now landed and added nothing: DeepSeek's API is OpenAI-compatible, so
+# `llm.py` is one `fetch.post_json` call and needs no SDK at all.
 dependencies = [
   "pydantic>=2.9",
   "pydantic-settings>=2.5",

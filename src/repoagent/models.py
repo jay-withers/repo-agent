@@ -14,12 +14,40 @@ from datetime import datetime
 
 
 @dataclass(frozen=True)
+class PullRequest:
+    """One open pull request, as much of it as the checks need."""
+
+    number: int
+    title: str
+    author: str
+    created_at: datetime | None
+    url: str = ""
+    draft: bool = False
+
+    @property
+    def is_renovate(self) -> bool:
+        """Whether Renovate opened this.
+
+        Matched on the author login rather than the title, because the title is
+        template-driven and a human can write anything. GitHub reports an App's
+        login with a `[bot]` suffix on REST and without it on GraphQL, so both
+        forms have to be accepted.
+        """
+        return self.author.lower().removesuffix("[bot]") in {"renovate", "renovate-bot"}
+
+
+@dataclass(frozen=True)
 class RepoSnapshot:
     """Everything the checks are allowed to see about one repository.
 
     The point of this type is that checks are pure functions of it: they do no
     I/O, so they are tested by constructing one of these directly, with no HTTP
     anywhere near the test.
+
+    The file fields hold text rather than a path or a flag, because both the
+    checks and the triage prompt need the content — "has a Renovate config" and
+    "has a Renovate config that only extends config:base" are different
+    findings. They are truncated at fetch time; see `github/client.py`.
     """
 
     name: str
@@ -32,6 +60,23 @@ class RepoSnapshot:
     has_license: bool = False
     has_readme: bool = False
     url: str = ""
+    private: bool = False
+
+    # Populated by the GraphQL detail query. Everything below is optional so a
+    # snapshot built from the REST list alone stays valid — which is what the
+    # `render` path falls back to when the detail query fails.
+    renovate_config: str | None = None
+    renovate_config_path: str | None = None
+    readme: str | None = None
+    dockerfile: str | None = None
+    workflows: tuple[str, ...] = ()
+    open_prs: tuple[PullRequest, ...] = ()
+    last_release: str | None = None
+    last_release_at: datetime | None = None
+
+    @property
+    def renovate_prs(self) -> tuple[PullRequest, ...]:
+        return tuple(pr for pr in self.open_prs if pr.is_renovate)
 
 
 @dataclass(frozen=True)
@@ -69,3 +114,9 @@ class ScanResult:
     repos: tuple[RepoSnapshot, ...] = ()
     findings: tuple[Finding, ...] = field(default_factory=tuple)
     image_tag: str = "unknown"
+
+    # Written by the model, and the only two fields here that are. Empty when
+    # triage is switched off or failed, which the digest renders as simply not
+    # having a commentary section rather than as an error.
+    summary: str = ""
+    themes: tuple[str, ...] = ()

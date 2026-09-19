@@ -6,6 +6,7 @@ import httpx
 
 from repoagent import digest
 from repoagent.jobs import scan
+from repoagent.models import ScanResult
 from tests.helpers import route_client
 
 _REPOS = {
@@ -106,9 +107,25 @@ def test_digest_reports_counts_from_the_data_not_from_prose() -> None:
     )
 
     assert "Scanned 2 repositories" in digest.render_text(result)
-    assert digest.subject(result) == "repo-agent — 2 repos, nothing to flag"
+    # The subject's figures are both derived from the result, never written by a
+    # model — which is the property this test exists to pin.
+    assert digest.subject(result) == (
+        f"repo-agent — {len(result.findings)} findings across {len(result.repos)} repos"
+    )
     # The repository with no description is flagged as such in the listing.
     assert "no description" in digest.render_text(result)
+
+
+def test_digest_says_nothing_to_flag_when_there_are_no_findings() -> None:
+    """The empty case, built directly rather than scanned.
+
+    A repository clean enough to produce no findings at all is hard to fake over
+    HTTP and trivial to construct, which is the point of the checks being pure.
+    """
+    result = ScanResult(repos=(), findings=(), image_tag="v0.1.0")
+
+    assert digest.subject(result) == "repo-agent — 0 repos, nothing to flag"
+    assert "No findings." in digest.render_text(result)
 
 
 def test_digest_carries_the_image_tag(monkeypatch) -> None:

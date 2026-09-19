@@ -44,6 +44,9 @@ def fake_secrets(monkeypatch: pytest.MonkeyPatch, rsa_private_key: str) -> None:
     monkeypatch.setenv("GITHUB_APP_PRIVATE_KEY", rsa_private_key)
     monkeypatch.setenv("RESEND_API_KEY", "re_test")
     monkeypatch.delenv("DIGEST_EMAIL_TO", raising=False)
+    # Absent by default, so triage is off unless a test switches it on. A test
+    # that accidentally enabled it would reach api.deepseek.com for real.
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
     monkeypatch.delenv("KEY_VAULT_URI", raising=False)
     monkeypatch.delenv("APPLICATIONINSIGHTS_CONNECTION_STRING", raising=False)
     monkeypatch.delenv("IMAGE_TAG", raising=False)

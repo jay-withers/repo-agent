@@ -80,6 +80,7 @@ secrets: ## Print the az commands that populate this project's Key Vault
 	@echo "az keyvault secret set --vault-name $$(terraform -chdir=$(TF_DIR) output -raw key_vault_name) --name GITHUB-APP-PRIVATE-KEY --file <path to .pem>"
 	@echo "az keyvault secret set --vault-name $$(terraform -chdir=$(TF_DIR) output -raw key_vault_name) --name RESEND-API-KEY --value <resend key>"
 	@echo "az keyvault secret set --vault-name $$(terraform -chdir=$(TF_DIR) output -raw key_vault_name) --name DIGEST-EMAIL-TO --value <address>"
+	@echo "az keyvault secret set --vault-name $$(terraform -chdir=$(TF_DIR) output -raw key_vault_name) --name DEEPSEEK-API-KEY --value <deepseek key>"
 
 init: ## terraform init, without configuring the state backend
 	terraform -chdir=$(TF_DIR) init -backend=false
