@@ -66,6 +66,7 @@ catch elsewhere.
 | `hygiene.stale` | low | No pushes in six months |
 | `estate.unmanaged` | high | On GitHub but absent from the `github-repos` catalogue |
 | `estate.unreportable_required_check` | high | Catalogue requires a status check no workflow in the repo reports |
+| `estate.unenforced_check` | medium | A workflow gates every PR, but the catalogue does not require its context |
 | `estate.incomplete_terraform_lock` | high | Providers locked for fewer platforms than run Terraform |
 | `estate.not_shared_preset` | low | Renovate config does not extend the estate's shared preset |
 | `workflows.unpinned_actions` | high | Third-party action referenced by a mutable tag |

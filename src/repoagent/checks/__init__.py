@@ -39,6 +39,10 @@ ALL: tuple[Check, ...] = (
     # a required check nothing reports blocks every pull request in the
     # repository, which outranks anything wrong inside one of them.
     estate.unreportable_required_check,
+    # The mirror of the above, and below it: a check nothing requires lets a
+    # bad pull request through, which is worse than nothing merging but not
+    # as bad as nothing merging at all.
+    estate.unenforced_check,
     estate.incomplete_terraform_lock,
     estate.not_shared_preset,
     workflows.unpinned_actions,

@@ -235,6 +235,34 @@ if that failure ever actually happens. Job ids are read with a regex on
 two-space indentation rather than with a YAML dependency, the same trade as
 `parse_catalogue` not being an HCL parser.
 
+**`estate.unenforced_check` is the same comparison run backwards**, and it is
+the half that actually happens. A repository is created from the template with
+every workflow in place, and its catalogue entry is written before anyone reads
+the context names off a pull request — so CI runs, goes red, and the pull
+request merges anyway because nothing in the ruleset is waiting on it. With
+`autoApprove` and platform auto-merge, no human ever sees the red tick.
+
+It only ever recommends a job that reports on **every** pull request, because a
+required check that sometimes does not report is worse than no required check at
+all — the exact failure the mirror check exists for. Three exclusions carry that:
+
+- a workflow with no `pull_request` trigger, which can never report on one;
+- a `pull_request` trigger carrying `paths`/`paths-ignore`, which is why this
+  repository's own `ci-container-build` is silent here rather than recommended;
+- a job with a matrix, whose context carries the leg (`plan (dev)`) and cannot
+  be reconstructed from the workflow text.
+
+Run against this repository's own six workflows it produces nothing, which is
+the test that matters: those exclusions are what make the difference between
+four correct recommendations on a fresh repository and four wrong ones here.
+
+`required_checks` is a **tri-state here too, and for a sharper reason than
+elsewhere**: `None` (catalogue unreadable, or the repository is absent from it —
+`estate.unmanaged` owns the second) must stay silent, while an **empty tuple is
+a claim** — declared, requiring nothing — and is precisely the case this check
+was written for. `unreportable_required_check`'s `if not required` conflates the
+two harmlessly; this one must not.
+
 Workflow **contents** are fetched, not just filenames, because whether an action
 is pinned to a commit and which runner a job asks for are answered by the text
 and nothing else. They are deliberately **not** sent to the triage prompt —

@@ -14,6 +14,7 @@ GitHub that the catalogue does not know about.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from ..models import Finding, RepoSnapshot
 
@@ -82,6 +83,62 @@ def not_shared_preset(snapshot: RepoSnapshot) -> list[Finding]:
 _JOB_ID = re.compile(r"^  ([A-Za-z0-9_.-]+):\s*$")
 _JOB_NAME = re.compile(r"^    name:\s*(.+?)\s*$")
 _JOB_USES = re.compile(r"^    uses:\s*\S+")
+# `strategy:` sits at four spaces and `matrix:` under it at six. A matrix job's
+# context carries its leg — `plan (dev)` — which cannot be reconstructed from
+# here, so both checks below leave those jobs alone.
+_JOB_MATRIX = re.compile(r"^      matrix:\s*$")
+
+
+@dataclass(frozen=True)
+class _Job:
+    """One job, as much of it as a status check context depends on."""
+
+    id: str
+    name: str | None = None
+    # Whether the job calls a reusable workflow, which changes the shape of the
+    # context entirely: one per job in *that* workflow, namespaced `<id> / <job>`.
+    calls: bool = False
+    matrix: bool = False
+
+    @property
+    def context(self) -> str:
+        """What this job reports, for a job that reports one name."""
+        return self.name or self.id
+
+
+def _jobs(text: str) -> list[_Job]:
+    """Every job in one workflow file, in the order it is declared."""
+    found: list[_Job] = []
+    in_jobs = False
+    job_id: str | None = None
+    name: str | None = None
+    calls = False
+    matrix = False
+
+    def close() -> None:
+        """Record the job just finished, now that its keys have been seen."""
+        if job_id is not None:
+            found.append(_Job(id=job_id, name=name, calls=calls, matrix=matrix))
+
+    for line in text.splitlines():
+        if not in_jobs:
+            in_jobs = line.rstrip() == "jobs:"
+            continue
+        match = _JOB_ID.match(line)
+        if match:
+            close()
+            job_id, name, calls, matrix = match.group(1), None, False, False
+            continue
+        if job_id is None:
+            continue
+        if _JOB_USES.match(line):
+            calls = True
+        elif _JOB_MATRIX.match(line):
+            matrix = True
+        elif named := _JOB_NAME.match(line):
+            name = named.group(1).strip("\"'")
+    close()
+    return found
 
 
 def _producible_contexts(text: str) -> tuple[set[str], set[str]]:
@@ -93,39 +150,58 @@ def _producible_contexts(text: str) -> tuple[set[str], set[str]]:
     `<caller job id> / <reusable job name>` — and the second half lives in
     another repository, so only the caller id can be checked from here.
     """
-    direct: set[str] = set()
-    callers: set[str] = set()
-    in_jobs = False
-    job_id: str | None = None
-    job_name: str | None = None
-    calls = False
+    jobs = _jobs(text)
+    return (
+        {job.context for job in jobs if not job.calls},
+        {job.id for job in jobs if job.calls},
+    )
 
-    def close() -> None:
-        """Record the job just finished, now that its keys have been seen."""
-        if job_id is None:
-            return
-        if calls:
-            callers.add(job_id)
-        else:
-            direct.add(job_name or job_id)
 
-    for line in text.splitlines():
-        if not in_jobs:
-            in_jobs = line.rstrip() == "jobs:"
+# A workflow only gates a pull request if it is triggered by one, and only gates
+# *every* pull request if that trigger carries no path filter. Both halves
+# matter: a required check that does not report leaves a pull request pending
+# for ever, which is the failure `unreportable_required_check` exists for.
+_ON = re.compile(r"""^["']?on["']?:\s*(.*?)\s*$""")
+_EVENT = re.compile(r"""^  ["']?([A-Za-z_]+)["']?:\s*$""")
+_PATH_FILTER = re.compile(r"^    paths(-ignore)?:")
+
+
+def _gates_every_pull_request(text: str) -> bool:
+    """Whether this workflow runs on every pull request, unconditionally.
+
+    False for a workflow that is not triggered by `pull_request` at all — a
+    release or deploy workflow can never be a required check — and false for one
+    whose trigger is path filtered, because a pull request touching none of
+    those paths never runs it, and a required check that never runs never
+    reports. That is exactly why this repository's own `ci-container-build` is
+    deliberately not required.
+    """
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        match = _ON.match(line)
+        if not match:
             continue
-        match = _JOB_ID.match(line)
-        if match:
-            close()
-            job_id, job_name, calls = match.group(1), None, False
-            continue
-        if job_id is None:
-            continue
-        if _JOB_USES.match(line):
-            calls = True
-        elif name := _JOB_NAME.match(line):
-            job_name = name.group(1).strip("\"'")
-    close()
-    return direct, callers
+
+        # `on: pull_request` or `on: [push, pull_request]`, all on one line.
+        inline = match.group(1).split("#", 1)[0].strip()
+        if inline:
+            return "pull_request" in re.split(r"[\s,\[\]]+", inline)
+
+        # The block form. Events sit at two spaces, their keys at four.
+        triggered = False
+        in_pull_request = False
+        for rest in lines[index + 1 :]:
+            if not rest.strip():
+                continue
+            if not rest.startswith("  "):
+                break
+            if event := _EVENT.match(rest):
+                in_pull_request = event.group(1) == "pull_request"
+                triggered = triggered or in_pull_request
+            elif in_pull_request and _PATH_FILTER.match(rest):
+                return False
+        return triggered
+    return False
 
 
 def unreportable_required_check(snapshot: RepoSnapshot) -> list[Finding]:
@@ -179,6 +255,72 @@ def unreportable_required_check(snapshot: RepoSnapshot) -> list[Finding]:
                 "nothing merges except by bypassing the ruleset."
             ),
             evidence_url=f"{snapshot.url}/tree/{snapshot.default_branch}/.github/workflows",
+        )
+    ]
+
+
+def unenforced_check(snapshot: RepoSnapshot) -> list[Finding]:
+    """A workflow that gates every pull request, which nothing requires.
+
+    The mirror of `unreportable_required_check`, and the half that actually
+    happens: a repository is created from a template with the full set of
+    workflows, and its catalogue entry is written with one or two contexts, or
+    none at all. The CI is there, it runs, it goes red — and the pull request
+    merges anyway, because nothing in the ruleset is waiting on it. With
+    `autoApprove` and platform auto-merge on Renovate pull requests, no human
+    ever sees the red tick.
+
+    Only jobs that report on **every** pull request are counted, which is what
+    makes this safe to act on: a required check that does not always report is
+    worse than no required check at all, so path-filtered workflows and matrix
+    jobs are left out rather than recommended. For a job calling a reusable
+    workflow the caller id is matched as a prefix, for the same reason the
+    other direction only checks the caller id — the job names after the slash
+    live in another repository.
+    """
+    required = snapshot.required_checks
+    # None means the catalogue could not be read, or does not declare this
+    # repository at all. Neither is a claim about its ruleset, and
+    # `estate.unmanaged` already reports the second. An *empty* tuple is a
+    # claim: declared, and requiring nothing — which is the case this exists for.
+    if required is None or not snapshot.workflows:
+        return []
+
+    unenforced: list[tuple[str, str]] = []
+    for wf in snapshot.workflows:
+        if not _gates_every_pull_request(wf.text):
+            continue
+        for job in _jobs(wf.text):
+            if job.matrix:
+                continue
+            if job.calls:
+                prefix = f"{job.id} / "
+                if not any(c == job.id or c.startswith(prefix) for c in required):
+                    # The far half is defined in the reusable workflow's own
+                    # repository, so it is left unwritten rather than guessed.
+                    unenforced.append((f"{job.id} / \u2026", wf.name))
+            elif job.context not in required:
+                unenforced.append((job.context, wf.name))
+
+    if not unenforced:
+        return []
+
+    listed = ", ".join(f"`{context}` ({name})" for context, name in unenforced)
+    return [
+        Finding(
+            repo=snapshot.full_name,
+            check="estate.unenforced_check",
+            severity="medium",
+            title=f"{len(unenforced)} pull request check(s) nothing requires",
+            detail=(
+                f"{listed} not in this repository's `required_status_checks` in the "
+                "github-repos catalogue, so a red run does not block a merge — and a "
+                "Renovate pull request, auto-approved and auto-merged, never has a human "
+                "to notice. Each runs on every pull request, so each can be required "
+                "without leaving one pending. Read the exact context off `gh pr checks` "
+                "rather than inferring it."
+            ),
+            evidence_url="https://github.com/jay-withers/github-repos",
         )
     ]
 
