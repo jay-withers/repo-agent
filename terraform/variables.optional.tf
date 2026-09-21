@@ -72,7 +72,7 @@ variable "image_tag" {
 }
 
 variable "scan_cron_expression" {
-  description = "When the scan runs, in UTC. Five fields, no seconds field, so the wall-clock time shifts with British Summer Time. Monday morning by default, so the week's findings are waiting rather than arriving mid-week."
+  description = "When the scan runs, in UTC. Five fields, no seconds field, so the wall-clock time shifts with British Summer Time. Sunday evening by default, so the digest is waiting on Monday morning but is measured after a full week of Renovate merges rather than an hour into Monday's burst."
   type        = string
-  default     = "0 7 * * 1"
+  default     = "0 18 * * 0"
 }

@@ -59,6 +59,7 @@ def snapshot(**overrides: object) -> RepoSnapshot:
         "default_branch": "main",
         "archived": False,
         "pushed_at": datetime.now(UTC) - timedelta(days=3),
+        "created_at": datetime.now(UTC) - timedelta(days=400),
         "topics": (),
         "has_license": True,
         "has_readme": True,
@@ -75,6 +76,8 @@ def snapshot(**overrides: object) -> RepoSnapshot:
         # satisfies its own required checks.
         "required_checks": ("test",),
         "open_prs": (),
+        # Healthy means Renovate has actually delivered something here.
+        "renovate_pr_ever": True,
         "last_release": "v1.0.0",
         "last_release_at": datetime.now(UTC) - timedelta(days=10),
     }

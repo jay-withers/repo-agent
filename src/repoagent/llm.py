@@ -78,8 +78,10 @@ PRICES_USD_PER_MTOK = {
 }
 
 # DeepSeek charges peak rates 01:00-04:00 and 06:00-10:00 UTC, Monday to Friday.
-# The scan's own 07:00 Monday cron sits inside the second window, so the digest
-# is billed at double — worth knowing before moving the schedule to save nothing.
+# The scan's own Sunday cron is outside them: weekends are off-peak in full, so
+# the digest is billed at the lower rate. It used to run 07:00 on Monday, inside
+# the second window and billed at double — the schedule moved to measure
+# Renovate honestly rather than to save money, and the halving came free.
 PEAK_WINDOWS_UTC = ((1, 4), (6, 10))
 
 # Enough for a few hundred more weekly runs. Below it the next digest is at real

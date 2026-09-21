@@ -26,9 +26,14 @@ resource "azurerm_container_app_job" "scan" {
     identity_ids = [azurerm_user_assigned_identity.this.id]
   }
 
-  # Monday morning, so the week's findings are waiting rather than arriving
-  # mid-week. Evaluated in UTC with five fields and no seconds field, so the
-  # wall-clock time shifts with British Summer Time.
+  # Sunday evening, so the digest is waiting on Monday morning without being
+  # measured during Monday's Renovate burst. The shared Renovate preset opens
+  # every repository's pull requests `before 6am on monday` and branch
+  # protection drains them one per Renovate run, so a Monday-morning scan
+  # counts a healthy queue mid-flight as a backlog. Sunday is the point of
+  # maximum drain, and is also off-peak for DeepSeek, which bills weekdays only.
+  # Evaluated in UTC with five fields and no seconds field, so the wall-clock
+  # time shifts with British Summer Time.
   #
   # ForceNew: changing the cron replaces the job rather than updating it. That
   # is harmless here, since the job holds no state.

@@ -269,7 +269,7 @@ def test_peak_rates_are_double(api_key: None) -> None:
     args = {"prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": 1_000_000}
     # Saturday noon: off-peak.
     off = llm._usage(args, "m", now=datetime(2026, 9, 19 + 0, 12, 0, tzinfo=UTC))
-    # Monday 07:00 UTC, which is when the job's own cron fires.
+    # Monday 07:00 UTC: inside 06:00-10:00, and where the job's cron used to be.
     peak = llm._usage(args, "m", now=datetime(2026, 9, 21, 7, 0, tzinfo=UTC))
 
     assert not off.peak
@@ -277,9 +277,15 @@ def test_peak_rates_are_double(api_key: None) -> None:
     assert peak.cost_usd == pytest.approx(off.cost_usd * 2)
 
 
-def test_the_scans_own_schedule_falls_in_a_peak_window() -> None:
-    """Monday 07:00 UTC sits inside 06:00-10:00. Worth knowing before moving it."""
-    assert llm._is_peak(datetime(2026, 9, 21, 7, 0, tzinfo=UTC))
+def test_the_scans_own_schedule_is_off_peak() -> None:
+    """Sunday 18:00 UTC, the job's own cron. Weekends are off-peak in full.
+
+    The schedule moved off Monday 07:00 — which sat inside 06:00-10:00 and was
+    billed at double — to measure Renovate after a week of merges rather than
+    during Monday's burst. Halving the triage bill was the side effect, and this
+    pins it so moving the cron back does not quietly restore the peak rate.
+    """
+    assert not llm._is_peak(datetime(2026, 9, 20, 18, 0, tzinfo=UTC))
 
 
 def test_weekends_are_off_peak() -> None:
