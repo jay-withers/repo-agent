@@ -18,6 +18,10 @@ def _checks(findings: list) -> set[str]:
     return {f.check for f in findings}
 
 
+def _days_ago(days: int) -> datetime:
+    return datetime.now(UTC) - timedelta(days=days)
+
+
 # --- renovate ---------------------------------------------------------------
 
 
@@ -62,19 +66,85 @@ def test_an_old_renovate_pr_is_stalled() -> None:
     assert findings[0].age_days == 40
 
 
-def test_a_backlog_of_fresh_prs_is_still_a_finding() -> None:
-    """Renovate stops opening PRs at prConcurrentLimit, so volume matters too."""
-    prs = tuple(renovate_pr(days_old=1, number=n) for n in range(1, 7))
+def test_a_backlog_opened_this_morning_is_not_a_finding() -> None:
+    """The estate opens a week of updates in one Monday burst.
+
+    The shared preset schedules PRs `before 6am on monday` and the scan runs at
+    07:00 that same morning, so a healthy repository is always momentarily
+    backlogged at the one moment this check looks. Counting that as a stall
+    reported market-agent every week while every PR in it auto-merged the same
+    day.
+    """
+    prs = tuple(renovate_pr(days_old=0, number=n) for n in range(1, 7))
+
+    assert renovate.stalled_prs(snapshot(open_prs=prs)) == []
+
+
+def test_a_backlog_that_outlived_a_schedule_window_is_a_finding() -> None:
+    """Volume still matters — once it has survived a weekly cycle."""
+    prs = tuple(renovate_pr(days_old=8, number=n) for n in range(1, 7))
     findings = renovate.stalled_prs(snapshot(open_prs=prs))
 
     assert len(findings) == 1
     assert "6 open Renovate PRs" in findings[0].detail
+    assert findings[0].severity == "medium"
+
+
+def test_a_small_number_of_old_prs_is_not_a_backlog() -> None:
+    """Under the count, only the 21-day stale arm can fire."""
+    prs = tuple(renovate_pr(days_old=8, number=n) for n in range(1, 4))
+
+    assert renovate.stalled_prs(snapshot(open_prs=prs)) == []
 
 
 def test_stalled_and_backlogged_together_escalates_to_high() -> None:
     prs = tuple(renovate_pr(days_old=40, number=n) for n in range(1, 7))
 
     assert renovate.stalled_prs(snapshot(open_prs=prs))[0].severity == "high"
+
+
+def test_a_repository_renovate_has_never_delivered_to_is_a_finding() -> None:
+    """The gap every other Renovate check leaves open.
+
+    Config present, no onboarding PR, nothing open, shared preset extended —
+    all four other checks pass on a repository that has never received one
+    dependency update.
+    """
+    repo = snapshot(renovate_pr_ever=False, created_at=_days_ago(30))
+    findings = renovate.never_opened_a_pr(repo)
+
+    assert len(findings) == 1
+    assert findings[0].check == "renovate.never_opened_a_pr"
+    assert findings[0].severity == "high"
+    assert findings[0].age_days == 30
+    # Every other Renovate check is silent on it, which is why this one exists.
+    assert _checks(checks.run_all(repo)) == {"renovate.never_opened_a_pr"}
+
+
+def test_a_new_repository_has_not_missed_its_first_window_yet() -> None:
+    """The preset opens PRs one window a week, so under a week proves nothing."""
+    repo = snapshot(renovate_pr_ever=False, created_at=_days_ago(3))
+
+    assert renovate.never_opened_a_pr(repo) == []
+
+
+def test_an_unanswerable_pr_history_never_reads_as_never_ran() -> None:
+    """None is "could not tell" — the `in_catalogue` rule.
+
+    The closed-PR history is one page deep, so a busy repository can fill it
+    with human pull requests. Reporting that as "Renovate has never run" would
+    name the estate's most active repositories as its deadest.
+    """
+    assert renovate.never_opened_a_pr(snapshot(renovate_pr_ever=None)) == []
+
+
+def test_a_repository_with_no_config_is_left_to_the_config_check() -> None:
+    """One fault must not produce two findings under two names."""
+    repo = snapshot(renovate_config=None, renovate_pr_ever=False, created_at=_days_ago(30))
+
+    assert renovate.never_opened_a_pr(repo) == []
+    assert _checks(checks.run_all(repo)) >= {"renovate.missing_config"}
+    assert "renovate.never_opened_a_pr" not in _checks(checks.run_all(repo))
 
 
 def test_a_humans_pull_request_is_not_renovates() -> None:
