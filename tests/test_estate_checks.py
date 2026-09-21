@@ -211,6 +211,142 @@ def test_a_repository_with_no_workflows_at_all_flags_nothing() -> None:
     )
 
 
+# --- unenforced checks ------------------------------------------------------
+
+# The shape a repository is created in: every workflow present and running, and
+# the catalogue entry written before anyone read the context names off a pull
+# request.
+PATH_FILTERED_WORKFLOW = """\
+name: ci-container-build
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - src/**
+      - Dockerfile
+
+jobs:
+  build:
+    uses: jay-withers/workflows/docker.yml@2d4b1e0f3a5c7d9e1f2a3b4c5d6e7f8091a2b3c4 # v1.4.5
+"""
+
+RELEASE_WORKFLOW = """\
+name: cd-tag
+on:
+  push:
+    branches: [main]
+jobs:
+  tag:
+    uses: jay-withers/workflows/release.yml@2d4b1e0f3a5c7d9e1f2a3b4c5d6e7f8091a2b3c4 # v1.4.5
+"""
+
+MATRIX_WORKFLOW = """\
+name: ci-terraform
+on: [pull_request]
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev]
+    steps:
+      - run: terraform plan
+"""
+
+
+def test_a_check_that_runs_on_every_pull_request_and_is_not_required_is_flagged() -> None:
+    """The new-repository case: the CI exists, and nothing is waiting on it."""
+    findings = estate.unenforced_check(
+        snapshot(
+            workflows=(workflow(name="ci-terraform.yml", text=CALLER_WORKFLOW),),
+            required_checks=(),
+        )
+    )
+
+    assert len(findings) == 1
+    assert findings[0].check == "estate.unenforced_check"
+    assert findings[0].severity == "medium"
+    assert "terraform / …" in findings[0].detail
+    assert "terraform-plan" in findings[0].detail
+
+
+def test_a_required_context_satisfies_its_caller_job() -> None:
+    assert (
+        estate.unenforced_check(
+            snapshot(
+                workflows=(workflow(name="ci-terraform.yml", text=CALLER_WORKFLOW),),
+                required_checks=("terraform / Terraform", "terraform-plan"),
+            )
+        )
+        == []
+    )
+
+
+def test_a_path_filtered_workflow_is_never_recommended() -> None:
+    """Requiring one would leave every docs-only pull request pending for ever,
+    which is the failure `unreportable_required_check` exists for. This repo's
+    own `ci-container-build` is the case."""
+    assert (
+        estate.unenforced_check(
+            snapshot(
+                workflows=(workflow(name="ci-container-build.yml", text=PATH_FILTERED_WORKFLOW),),
+                required_checks=(),
+            )
+        )
+        == []
+    )
+
+
+def test_a_workflow_no_pull_request_triggers_is_never_recommended() -> None:
+    """A release workflow runs on merge; it can never report on a pull request."""
+    assert (
+        estate.unenforced_check(
+            snapshot(
+                workflows=(workflow(name="cd-tag.yml", text=RELEASE_WORKFLOW),),
+                required_checks=(),
+            )
+        )
+        == []
+    )
+
+
+def test_a_matrix_job_is_never_recommended() -> None:
+    """Its context carries the leg — `plan (dev)` — which cannot be
+    reconstructed from the workflow, and a guessed context would never report."""
+    assert (
+        estate.unenforced_check(
+            snapshot(
+                workflows=(workflow(name="ci-terraform.yml", text=MATRIX_WORKFLOW),),
+                required_checks=(),
+            )
+        )
+        == []
+    )
+
+
+def test_a_catalogue_that_could_not_be_read_recommends_nothing() -> None:
+    """`None` is not the same fact as an empty list, and must not be reported as
+    one: it means the catalogue could not be read, or does not name this
+    repository at all — which `estate.unmanaged` already owns."""
+    assert estate.unenforced_check(snapshot(required_checks=None)) == []
+
+
+def test_an_empty_required_list_is_a_claim_and_is_reported() -> None:
+    """Declared in the catalogue, requiring nothing. The whole point."""
+    assert len(estate.unenforced_check(snapshot(required_checks=()))) == 1
+
+
+def test_a_repository_with_no_workflows_recommends_nothing() -> None:
+    """A failed detail query leaves every snapshot workflow-less."""
+    assert estate.unenforced_check(snapshot(workflows=(), required_checks=())) == []
+
+
+def test_a_healthy_repository_has_nothing_to_enforce() -> None:
+    """The factory's default: one job, and the catalogue requires exactly it."""
+    assert estate.unenforced_check(snapshot()) == []
+
+
 # --- terraform lock ---------------------------------------------------------
 
 
