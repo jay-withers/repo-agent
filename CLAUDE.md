@@ -241,6 +241,66 @@ and nothing else. They are deliberately **not** sent to the triage prompt —
 `llm._user_prompt` sends `workflow_names` — since a dozen workflow files per
 repository would dominate it.
 
+## Onboarded is not activated
+
+`renovate.never_opened_a_pr` exists because the other four Renovate checks all
+pass on a repository that has never received a single dependency update. A repo
+created from the template carries a config (so `missing_config` passes), commits
+it directly rather than onboarding (no PR for `onboarding_unmerged`), has
+nothing open (`stalled_prs` sees nothing) and extends the shared preset
+(`default_config_only` is satisfied). Everything is green and nothing has ever
+been updated.
+
+Four repositories were in that state at once — `gym-log`, `finances`,
+`azure-container-apps` and `repo-agent` itself — each showing **onboarded**
+rather than **activated** in Mend's portal, each with a full Dependency
+Dashboard and seven updates parked under *Awaiting Schedule*. Renovate had run
+and detected everything; it had simply never had a job land inside the preset's
+`before 6am on monday` window. `updateNotScheduled: true` means it rebases
+existing branches at any hour, so only *creation* is confined to those six
+hours a week — which is why market-agent's PRs were created at 00:55 and 05:34
+but rebased at 16:06 and 19:01.
+
+Two operator notes worth keeping:
+
+- On the Dependency Dashboard, **`Create all awaiting schedule PRs at once` is
+  the checkbox that works**. `Check this box to trigger a request for Renovate
+  to run again` does not: the run re-evaluates the schedule, finds it is not
+  Monday morning, and parks everything again. The existence of two separate
+  checkboxes is the proof.
+- `renovate_pr_ever` is a **tri-state**, for the same reason `in_catalogue` is.
+  The closed-PR history is one 30-node page, so a repository with a long human
+  history fills it with human pull requests. `None` means the page could not
+  answer, and must never render as "Renovate has never run" — that would report
+  the estate's busiest repositories as its deadest.
+
+**The check only ever fires once per repository.** The moment Renovate opens its
+first PR it goes quiet for good, so it catches a repository that never started,
+not one that dies later — `stalled_prs` is the check for that. Dead-since-birth
+is the case worth the finding, because nothing else in the estate will ever
+mention it.
+
+## The scan runs an hour after Renovate's burst
+
+The estate's shared preset (`github>jay-withers/renovate`) opens pull requests
+`before 6am on monday` and throttles them with `prHourlyLimit: 4`. The scan's
+own cron is `0 7 * * 1`. **The agent therefore observes every repository at its
+weekly peak open-PR count**, one hour after a week of updates has landed in one
+burst, and it always will.
+
+`renovate.stalled_prs` reported market-agent every Monday because of this. Six
+PRs were open at 07:00; all of them had been merged by `renovate[bot]` through
+platform auto-merge by that evening, each within two minutes of Renovate
+rebasing it. The spread that made it look manual is
+`strict_required_status_checks_policy` on the ruleset: branches must be up to
+date, so one merge invalidates every other open PR and the queue drains at one
+per Renovate run.
+
+So the backlog arm requires `BACKLOG_MIN_AGE_DAYS` as well as a count — a PR
+that has outlived a full weekly cycle. Volume on its own is a measurement of
+the clock, not of the repository. The count itself is measured against the
+preset's `prConcurrentLimit: 20`, **not** Renovate's default of 10.
+
 ## The checks, and what the model is allowed to do
 
 **Checks are pure `(RepoSnapshot) -> list[Finding]` functions in `checks/`, and

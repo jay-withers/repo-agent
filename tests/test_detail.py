@@ -35,6 +35,7 @@ def _detail(**overrides: object) -> dict:
             ]
         },
         "pullRequests": {"totalCount": 0, "nodes": []},
+        "closedPullRequests": {"totalCount": 0, "nodes": []},
         "releases": {"nodes": [{"tagName": "v1.2.3", "publishedAt": "2026-09-01T00:00:00Z"}]},
     }
     return {**base, **overrides}
@@ -143,3 +144,86 @@ def test_a_null_alias_is_skipped_rather_than_failing_the_batch() -> None:
     )
 
     assert list(details) == ["jay-withers/widget"]
+
+
+def test_a_merged_renovate_pr_proves_renovate_has_run() -> None:
+    merged = parse.merge_detail(
+        snapshot(renovate_pr_ever=None),
+        _detail(
+            closedPullRequests={
+                "totalCount": 2,
+                "nodes": [{"author": {"login": "jay-withers"}}, {"author": {"login": "renovate"}}],
+            }
+        ),
+    )
+
+    assert merged.renovate_pr_ever is True
+
+
+def test_an_open_renovate_pr_proves_it_too() -> None:
+    """The history page is not the only evidence — what is open counts."""
+    merged = parse.merge_detail(
+        snapshot(renovate_pr_ever=None),
+        _detail(
+            pullRequests={
+                "totalCount": 1,
+                "nodes": [
+                    {
+                        "number": 1,
+                        "title": "chore(deps): update httpx",
+                        "url": "u",
+                        "isDraft": False,
+                        "createdAt": "2026-09-01T00:00:00Z",
+                        "author": {"login": "renovate[bot]"},
+                    }
+                ],
+            }
+        ),
+    )
+
+    assert merged.renovate_pr_ever is True
+
+
+def test_a_complete_history_with_no_renovate_pr_proves_the_negative() -> None:
+    merged = parse.merge_detail(
+        snapshot(renovate_pr_ever=None),
+        _detail(
+            closedPullRequests={
+                "totalCount": 1,
+                "nodes": [{"author": {"login": "jay-withers"}}],
+            }
+        ),
+    )
+
+    assert merged.renovate_pr_ever is False
+
+
+def test_a_history_longer_than_the_page_answers_nothing() -> None:
+    """Absence is only evidence when the page holds everything there is.
+
+    A busy repository fills this page with human pull requests, and calling
+    that "Renovate has never run" would report the estate's most active
+    repositories as its deadest.
+    """
+    merged = parse.merge_detail(
+        snapshot(renovate_pr_ever=None),
+        _detail(
+            closedPullRequests={
+                "totalCount": 400,
+                "nodes": [{"author": {"login": "jay-withers"}}],
+            }
+        ),
+    )
+
+    assert merged.renovate_pr_ever is None
+
+
+def test_a_failed_detail_query_leaves_the_question_unanswered() -> None:
+    """The `render` fallback path must not invent a high-severity finding."""
+    assert parse.merge_detail(snapshot(renovate_pr_ever=None), None).renovate_pr_ever is None
+
+
+def test_the_detail_query_asks_for_closed_pull_request_history() -> None:
+    """Pinned: without this the check can only ever answer None."""
+    assert "closedPullRequests" in github_client._REPO_FRAGMENT
+    assert "states: [MERGED, CLOSED]" in github_client._REPO_FRAGMENT

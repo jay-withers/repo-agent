@@ -22,6 +22,7 @@ def repo_snapshot(raw: dict[str, Any]) -> RepoSnapshot:
         default_branch=raw.get("default_branch", "main"),
         archived=bool(raw.get("archived", False)),
         pushed_at=_timestamp(raw.get("pushed_at")),
+        created_at=_timestamp(raw.get("created_at")),
         topics=tuple(raw.get("topics") or ()),
         has_license=raw.get("license") is not None,
         url=raw.get("html_url", ""),
@@ -73,6 +74,7 @@ def merge_detail(snapshot: RepoSnapshot, detail: dict[str, Any] | None) -> RepoS
     releases = (detail.get("releases") or {}).get("nodes") or []
     release = releases[0] if releases else {}
     prs = (detail.get("pullRequests") or {}).get("nodes") or []
+    open_prs = tuple(pull_request(raw) for raw in prs)
 
     return replace(
         snapshot,
@@ -91,10 +93,39 @@ def merge_detail(snapshot: RepoSnapshot, detail: dict[str, Any] | None) -> RepoS
         # `terraform/` first, which is this estate's layout; the root is the
         # fallback for a repository that is itself a module.
         terraform_lock=_blob_text(detail.get("tflock")) or _blob_text(detail.get("tflock_root")),
-        open_prs=tuple(pull_request(raw) for raw in prs),
+        open_prs=open_prs,
+        renovate_pr_ever=_renovate_pr_ever(detail, open_prs),
         last_release=release.get("tagName"),
         last_release_at=_timestamp(release.get("publishedAt")),
     )
+
+
+def _renovate_pr_ever(detail: dict[str, Any], open_prs: tuple[PullRequest, ...]) -> bool | None:
+    """Whether Renovate has ever opened a pull request in this repository.
+
+    None where the question cannot be answered. The closed-PR history is one
+    page deep, so a repository with more pull requests than that page holds and
+    no Renovate author on it has *not* proved Renovate never ran — it has only
+    proved the page is full of something else. Saying False there would report
+    the estate's busiest repositories as dead.
+    """
+    if any(pr.is_renovate for pr in open_prs):
+        return True
+
+    closed = detail.get("closedPullRequests") or {}
+    nodes = closed.get("nodes") or []
+    if any(_is_renovate_login((node.get("author") or {}).get("login") or "") for node in nodes):
+        return True
+
+    total = closed.get("totalCount")
+    if not isinstance(total, int) or total > len(nodes):
+        return None
+    return False
+
+
+def _is_renovate_login(login: str) -> bool:
+    """`PullRequest.is_renovate`'s rule, for a bare login with no PR around it."""
+    return login.lower().removesuffix("[bot]") in {"renovate", "renovate-bot"}
 
 
 def _renovate_config(detail: dict[str, Any]) -> tuple[str | None, str | None]:

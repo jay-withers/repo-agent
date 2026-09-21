@@ -70,6 +70,10 @@ class RepoSnapshot:
     default_branch: str
     archived: bool
     pushed_at: datetime | None
+    # When the repository was created. Carried only so a check can tell a
+    # repository that has never received an update from one that was made on
+    # Friday and has not had the chance yet.
+    created_at: datetime | None = None
     topics: tuple[str, ...] = ()
     has_license: bool = False
     has_readme: bool = False
@@ -95,6 +99,13 @@ class RepoSnapshot:
     # `estate.unmanaged` already reports the second.
     required_checks: tuple[str, ...] | None = None
     open_prs: tuple[PullRequest, ...] = ()
+    # Whether Renovate has *ever* opened a pull request here, open or closed.
+    # A tri-state for the same reason `in_catalogue` is one: None means the
+    # question could not be answered — the detail query failed, or the
+    # repository has more pull requests than the history window reaches — and
+    # must never render as "Renovate has never run", which is a high-severity
+    # claim about a repository that may be perfectly healthy.
+    renovate_pr_ever: bool | None = None
     last_release: str | None = None
     last_release_at: datetime | None = None
 

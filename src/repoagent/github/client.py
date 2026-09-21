@@ -118,6 +118,23 @@ _REPO_FRAGMENT = """
         author { login }
       }
     }
+    # Whether Renovate has ever opened a pull request here at all, which is a
+    # different question from whether one is open now — a repository that has
+    # never received a single update looks identical to a fully merged one if
+    # you only count what is open.
+    #
+    # Ordered ASC rather than DESC: Renovate opens its first PR within days of
+    # onboarding, so the *earliest* pull requests are where the evidence is,
+    # and a repository with a long human history would push it off a DESC page.
+    # `totalCount` is what makes the answer honest — where it exceeds the page,
+    # absence proves nothing and `parse` returns None rather than False.
+    # Author is the only field needed; nothing here is ever rendered.
+    closedPullRequests: pullRequests(
+      states: [MERGED, CLOSED], first: 30, orderBy: {field: CREATED_AT, direction: ASC}
+    ) {
+      totalCount
+      nodes { author { login } }
+    }
     releases(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) {
       nodes { tagName publishedAt }
     }

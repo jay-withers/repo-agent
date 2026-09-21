@@ -27,6 +27,9 @@ Check = Callable[[RepoSnapshot], list[Finding]]
 ALL: tuple[Check, ...] = (
     renovate.missing_config,
     renovate.onboarding_unmerged,
+    # Above `stalled_prs`: a repository that has never had an update at all
+    # outranks one whose updates have stopped moving.
+    renovate.never_opened_a_pr,
     renovate.stalled_prs,
     renovate.default_config_only,
     # Estate before hygiene: a repository outside the catalogue has nothing
