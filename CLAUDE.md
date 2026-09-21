@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 One Python package (`repoagent`), one image, one Container Apps job. It reads
 every GitHub repository the App is installed on, checks Renovate is actually
-working, and emails a weekly digest on Monday mornings.
+working, and emails a weekly digest that is waiting on Monday morning.
 
 `README.md` covers *why* and how to run it. This file covers the traps.
 
@@ -280,26 +280,38 @@ not one that dies later — `stalled_prs` is the check for that. Dead-since-birt
 is the case worth the finding, because nothing else in the estate will ever
 mention it.
 
-## The scan runs an hour after Renovate's burst
+## The scan runs on Sunday, and that is load-bearing
 
 The estate's shared preset (`github>jay-withers/renovate`) opens pull requests
 `before 6am on monday` and throttles them with `prHourlyLimit: 4`. The scan's
-own cron is `0 7 * * 1`. **The agent therefore observes every repository at its
-weekly peak open-PR count**, one hour after a week of updates has landed in one
-burst, and it always will.
+cron used to be `0 7 * * 1`, which meant **the agent observed every repository
+at its weekly peak open-PR count**, one hour after a week of updates landed in
+one burst.
 
 `renovate.stalled_prs` reported market-agent every Monday because of this. Six
-PRs were open at 07:00; all of them had been merged by `renovate[bot]` through
-platform auto-merge by that evening, each within two minutes of Renovate
-rebasing it. The spread that made it look manual is
-`strict_required_status_checks_policy` on the ruleset: branches must be up to
-date, so one merge invalidates every other open PR and the queue drains at one
-per Renovate run.
+PRs were open at 07:00; all had been merged by `renovate[bot]` through platform
+auto-merge by that evening, each within two minutes of Renovate rebasing it.
+The spread that made it look manual is `strict_required_status_checks_policy`
+on the ruleset: branches must be up to date, so one merge invalidates every
+other open PR and the queue drains at one per Renovate run.
 
-So the backlog arm requires `BACKLOG_MIN_AGE_DAYS` as well as a count — a PR
-that has outlived a full weekly cycle. Volume on its own is a measurement of
-the clock, not of the repository. The count itself is measured against the
-preset's `prConcurrentLimit: 20`, **not** Renovate's default of 10.
+The cron is now `0 18 * * 0` — Sunday evening, the point of **maximum** drain,
+six days after the burst rather than one hour into it. A Renovate PR still open
+then has genuinely failed to merge, which is the only thing this check ever
+wanted to know. The digest still arrives for Monday morning. Two side effects
+worth knowing:
+
+- **Sunday is off-peak for DeepSeek**, which bills peak rates on weekdays only,
+  so triage now costs half what it did. That was not the reason to move and is
+  not a reason to move back.
+- **`BACKLOG_MIN_AGE_DAYS` is coupled to the cron.** At `0 7 * * 1` it had to be
+  a week or every healthy repository read as backlogged; on Sunday it is 2,
+  because a batch that never merged is six days old when the scan sees it.
+  Move the cron and this number moves with it, in the same direction — too high
+  on a Sunday scan and a week's failed batch is missed entirely.
+
+The count itself is measured against the preset's `prConcurrentLimit: 20`,
+**not** Renovate's default of 10.
 
 ## The checks, and what the model is allowed to do
 
@@ -387,9 +399,11 @@ separately rather than as one `prompt_tokens`. Where a response omits the
 breakdown everything counts as a miss, which over-estimates.
 
 **Peak rates double everything**, and DeepSeek's peak window is 01:00-04:00 and
-06:00-10:00 UTC on weekdays — so the scan's own `0 7 * * 1` cron sits inside it.
-Moving the schedule an hour later would halve a cost measured in tenths of a
-cent, which is not a reason to move it, but it should not be a surprise either.
+06:00-10:00 UTC on weekdays — and the scan's `0 18 * * 0` cron sits outside
+them, because weekends are off-peak in full. It used to run `0 7 * * 1`, inside
+the second window and billed at double; the schedule moved to measure Renovate
+honestly, not to save a cost measured in tenths of a cent, and the halving came
+free.
 Chinese public holidays are also off-peak and are **not** modelled, so a run on
 one is over-costed.
 

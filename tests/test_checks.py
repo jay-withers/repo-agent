@@ -66,23 +66,28 @@ def test_an_old_renovate_pr_is_stalled() -> None:
     assert findings[0].age_days == 40
 
 
-def test_a_backlog_opened_this_morning_is_not_a_finding() -> None:
+def test_a_backlog_opened_hours_ago_is_not_a_finding() -> None:
     """The estate opens a week of updates in one Monday burst.
 
-    The shared preset schedules PRs `before 6am on monday` and the scan runs at
-    07:00 that same morning, so a healthy repository is always momentarily
-    backlogged at the one moment this check looks. Counting that as a stall
-    reported market-agent every week while every PR in it auto-merged the same
-    day.
+    The shared preset schedules PRs `before 6am on monday`, and this check used
+    to run at 07:00 that same morning — so a healthy repository was always
+    momentarily backlogged at the one moment it looked, and market-agent was
+    reported every week while every PR in it auto-merged the same day.
     """
     prs = tuple(renovate_pr(days_old=0, number=n) for n in range(1, 7))
 
     assert renovate.stalled_prs(snapshot(open_prs=prs)) == []
 
 
-def test_a_backlog_that_outlived_a_schedule_window_is_a_finding() -> None:
-    """Volume still matters — once it has survived a weekly cycle."""
-    prs = tuple(renovate_pr(days_old=8, number=n) for n in range(1, 7))
+def test_last_mondays_batch_still_open_on_sunday_is_a_finding() -> None:
+    """The failure the check exists for, at the age the scan actually sees it.
+
+    Renovate opens the batch on Monday and the scan runs the following Sunday,
+    so a week's updates that never merged are six days old when counted. This
+    pins that `BACKLOG_MIN_AGE_DAYS` is low enough to catch them in the week
+    they failed rather than the week after.
+    """
+    prs = tuple(renovate_pr(days_old=6, number=n) for n in range(1, 7))
     findings = renovate.stalled_prs(snapshot(open_prs=prs))
 
     assert len(findings) == 1
@@ -92,7 +97,7 @@ def test_a_backlog_that_outlived_a_schedule_window_is_a_finding() -> None:
 
 def test_a_small_number_of_old_prs_is_not_a_backlog() -> None:
     """Under the count, only the 21-day stale arm can fire."""
-    prs = tuple(renovate_pr(days_old=8, number=n) for n in range(1, 4))
+    prs = tuple(renovate_pr(days_old=6, number=n) for n in range(1, 4))
 
     assert renovate.stalled_prs(snapshot(open_prs=prs)) == []
 

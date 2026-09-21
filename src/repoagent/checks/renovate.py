@@ -25,15 +25,21 @@ STALE_PR_DAYS = 21
 # of 10 — five is a quarter of the way to silence, not half.
 PR_BACKLOG_COUNT = 5
 
-# A backlog only means anything once it has survived a schedule window. The
-# shared preset opens PRs `before 6am on monday` and the scan's own cron is
-# `0 7 * * 1`, so the agent looks at the estate exactly one hour after a week's
-# updates land in one burst — every healthy repository with a few dependencies
-# is momentarily "backlogged" at the only moment this check ever runs.
-# Requiring one PR to have outlived a full weekly cycle is what separates
-# "Renovate opened eight PRs this morning" from "Renovate opened eight PRs and
-# none of them can merge".
-BACKLOG_MIN_AGE_DAYS = 7
+# A backlog only means anything once the PRs in it have had time to merge.
+#
+# This is **coupled to the scan's cron**. The shared preset opens every
+# repository's PRs `before 6am on monday`, and the scan runs Sunday evening —
+# the point of maximum drain, six days later. Two days is therefore generous:
+# the batch this check is looking for is a week old by the time it is counted,
+# and the guard exists only to discount a manually triggered Renovate run that
+# happened to open a batch just before the scan.
+#
+# Move the cron back towards Monday morning and this number has to rise with
+# it, or every healthy repository reads as backlogged — that is what it did at
+# `0 7 * * 1`, one hour after the burst. Raise it much above two and the
+# opposite failure appears: a week's batch that never merged is only six days
+# old on the Sunday it should be caught.
+BACKLOG_MIN_AGE_DAYS = 2
 
 # How long a repository gets to receive its first update before never having
 # had one is a finding. The shared preset opens PRs in one window a week, so
