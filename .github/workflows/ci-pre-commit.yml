@@ -9,6 +9,6 @@ permissions:
 
 jobs:
   pre-commit:
-    uses: jay-withers/workflows/.github/workflows/pre-commit.yml@a5015ee2aed310376c5a0a1b19ced327dfd4fbd4 # v1.4.5
+    uses: jay-withers/workflows/.github/workflows/pre-commit.yml@574d13224ca9f93028db0040e6574f419d0e9871 # v1.4.9
     with:
       terraform: true
