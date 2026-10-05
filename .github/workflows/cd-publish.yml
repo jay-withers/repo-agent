@@ -53,7 +53,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    uses: jay-withers/workflows/.github/workflows/docker.yml@574d13224ca9f93028db0040e6574f419d0e9871 # v1.4.9
+    uses: jay-withers/workflows/.github/workflows/docker.yml@6599cdd2b3f2870119a2de439360471b2b94765e # v1.4.11
     with:
       images: |
         [{"name": "repoagent", "context": "."}]
