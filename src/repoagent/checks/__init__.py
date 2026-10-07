@@ -17,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from ..models import Finding, RepoSnapshot
-from . import estate, hygiene, renovate, workflows
+from . import container, estate, hygiene, renovate, workflows
 
 Check = Callable[[RepoSnapshot], list[Finding]]
 
@@ -45,13 +45,22 @@ ALL: tuple[Check, ...] = (
     estate.unenforced_check,
     estate.incomplete_terraform_lock,
     estate.not_shared_preset,
+    # A privileged token running untrusted code is the worst thing a workflow
+    # file can say, so it leads the workflow checks.
+    workflows.pull_request_target_checkout,
     workflows.unpinned_actions,
     workflows.retired_runners,
+    workflows.unscoped_token,
+    container.unpinned_base_image,
+    container.runs_as_root,
     hygiene.no_readme,
     hygiene.no_license,
     hygiene.no_description,
     hygiene.no_ci,
     hygiene.stale,
+    # Last: housekeeping inside a repository that is otherwise fine.
+    hygiene.abandoned_prs,
+    hygiene.stale_branches,
 )
 
 

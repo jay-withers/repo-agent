@@ -14,15 +14,18 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from repoagent.models import PullRequest, RepoSnapshot, Workflow
+from repoagent.models import Branch, PullRequest, RepoSnapshot, Workflow
 
 HEALTHY_RENOVATE = '{"extends": ["github>jay-withers/renovate"], "packageRules": []}'
 
-# A workflow with nothing wrong with it: a supported runner, and every action
-# pinned to a commit with the tag as a comment — this estate's own convention.
+# A workflow with nothing wrong with it: a supported runner, a scoped token, and
+# every action pinned to a commit with the tag as a comment — this estate's own
+# convention.
 HEALTHY_WORKFLOW = """\
 name: CI
 on: [pull_request]
+permissions:
+  contents: read
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -76,6 +79,7 @@ def snapshot(**overrides: object) -> RepoSnapshot:
         # satisfies its own required checks.
         "required_checks": ("test",),
         "open_prs": (),
+        "branches": (branch("main", days_old=3),),
         # Healthy means Renovate has actually delivered something here.
         "renovate_pr_ever": True,
         "last_release": "v1.0.0",
@@ -95,3 +99,26 @@ def renovate_pr(days_old: int = 1, **overrides: object) -> PullRequest:
         "draft": False,
     }
     return PullRequest(**{**defaults, **overrides})  # type: ignore[arg-type]
+
+
+def human_pr(days_idle: int = 1, **overrides: object) -> PullRequest:
+    """An open pull request from a person, last touched `days_idle` days ago."""
+    defaults: dict[str, object] = {
+        "number": 7,
+        "title": "feat: add a sprocket",
+        "author": "jay-withers",
+        "created_at": datetime.now(UTC) - timedelta(days=days_idle + 5),
+        "updated_at": datetime.now(UTC) - timedelta(days=days_idle),
+        "url": "https://github.com/jay-withers/widget/pull/7",
+        "draft": False,
+    }
+    return PullRequest(**{**defaults, **overrides})  # type: ignore[arg-type]
+
+
+def branch(name: str = "feature", days_old: int = 1, has_open_pr: bool = False) -> Branch:
+    """A branch whose head commit is `days_old` days old."""
+    return Branch(
+        name=name,
+        committed_at=datetime.now(UTC) - timedelta(days=days_old),
+        has_open_pr=has_open_pr,
+    )

@@ -25,9 +25,9 @@ once, on a dependency PR nobody reads closely.
 **Working.** Four stages, and the order of the middle two is the design:
 
 1. **Fetch** — the REST installation list, then one batched GraphQL query for
-   the Renovate config, README, Dockerfile, workflow names, open pull requests
-   and latest release of each repository.
-2. **Check** — nine pure functions turn each snapshot into findings. Everything
+   the Renovate config, README, Dockerfile, workflow files, open pull requests,
+   branches and latest release of each repository.
+2. **Check** — pure functions turn each snapshot into findings. Everything
    the digest reports as fact is established here.
 3. **Triage** — DeepSeek orders those findings and writes a short paragraph of
    context. It cannot add, remove or alter one.
@@ -58,12 +58,15 @@ catch elsewhere.
 | `renovate.missing_config` | high | No config at any path Renovate reads |
 | `renovate.onboarding_unmerged` | high | Onboarding PR never merged, so Renovate opens nothing |
 | `renovate.stalled_prs` | medium/high | Updates not being merged, or a backlog nearing `prConcurrentLimit` |
-| `renovate.pinned_to_nothing` | low | Generated config nobody ever added a policy to |
+| `renovate.never_opened_a_pr` | high | Onboarded but never activated: no update has ever landed |
+| `renovate.default_config_only` | low | Generated config nobody ever added a policy to |
 | `hygiene.no_ci` | high/low | No workflows — high when Renovate is configured, since updates merge on faith |
 | `hygiene.no_readme` | medium | No README at the root |
 | `hygiene.no_license` | medium | Public repository with no detectable licence |
 | `hygiene.no_description` | low | Unidentifiable in a list |
 | `hygiene.stale` | low | No pushes in six months |
+| `hygiene.abandoned_prs` | low | Human PR idle 30 days (drafts 90) |
+| `hygiene.stale_branches` | low | Branch head older than 90 days, no open PR, not a bot's |
 | `estate.unmanaged` | high | On GitHub but absent from the `github-repos` catalogue |
 | `estate.unreportable_required_check` | high | Catalogue requires a status check no workflow in the repo reports |
 | `estate.unenforced_check` | medium | A workflow gates every PR, but the catalogue does not require its context |
@@ -72,6 +75,10 @@ catch elsewhere.
 | `workflows.unpinned_actions` | high | Third-party action referenced by a mutable tag |
 | `workflows.unpinned_first_party_actions` | low | GitHub-owned action on a tag |
 | `workflows.retired_runners` | medium | Runner image GitHub has withdrawn or will |
+| `workflows.unscoped_token` | medium | No `permissions:` at the top or on every job, so the token takes the repo default |
+| `workflows.pull_request_target_checkout` | high | `pull_request_target` workflow handling the PR's own head |
+| `container.unpinned_base_image` | medium | Root Dockerfile `FROM` without a digest |
+| `container.runs_as_root` | medium | Final stage has no non-root `USER` |
 
 Archived repositories are skipped wholesale: every finding would be true,
 unactionable and permanent, which is how you train someone to ignore an email.

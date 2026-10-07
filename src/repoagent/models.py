@@ -23,6 +23,9 @@ class PullRequest:
     created_at: datetime | None
     url: str = ""
     draft: bool = False
+    # Last activity of any kind — a push, a comment, a review. What "abandoned"
+    # is measured by; `created_at` is the fallback where it is missing.
+    updated_at: datetime | None = None
 
     @property
     def is_renovate(self) -> bool:
@@ -34,6 +37,15 @@ class PullRequest:
         forms have to be accepted.
         """
         return self.author.lower().removesuffix("[bot]") in {"renovate", "renovate-bot"}
+
+
+@dataclass(frozen=True)
+class Branch:
+    """One branch, as much of it as `hygiene.stale_branches` needs."""
+
+    name: str
+    committed_at: datetime | None
+    has_open_pr: bool = False
 
 
 @dataclass(frozen=True)
@@ -99,6 +111,15 @@ class RepoSnapshot:
     # `estate.unmanaged` already reports the second.
     required_checks: tuple[str, ...] | None = None
     open_prs: tuple[PullRequest, ...] = ()
+    # How many pull requests are open, which can exceed `open_prs`: that is one
+    # page, oldest first. None where the detail query did not say.
+    open_pr_total: int | None = None
+    # Branches, one page of them. None where they could not be read — the
+    # detail query failed — which must never read as "no stale branches" being
+    # a checked fact, nor the opposite. `branch_total` is the real count, so a
+    # page that does not hold them all can say "at least".
+    branches: tuple[Branch, ...] | None = None
+    branch_total: int | None = None
     # Whether Renovate has *ever* opened a pull request here, open or closed.
     # A tri-state for the same reason `in_catalogue` is one: None means the
     # question could not be answered — the detail query failed, or the

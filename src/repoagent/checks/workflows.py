@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 
 from ..models import Finding, RepoSnapshot
+from .workflow_text import jobs, triggers
 
 # `uses: owner/repo@ref` or `uses: owner/repo/path@ref`. Local (`./...`) and
 # Docker (`docker://...`) references have no ref to pin and are skipped.
@@ -24,6 +25,15 @@ _SHA = re.compile(r"^[0-9a-f]{40}$")
 # `runs-on: <label>`, including the `runs-on: [self-hosted, linux]` list form's
 # first element, which is enough to spot a retired image.
 _RUNS_ON = re.compile(r"^\s*runs-on:\s*\[?\s*['\"]?([A-Za-z0-9._-]+)")
+
+# A top-level `permissions:` key. Column 0 only: the same key indented belongs
+# to a job, and is counted per job by `workflow_text.jobs`.
+_TOP_PERMISSIONS = re.compile(r"^permissions:")
+
+# The pull request's own head, in any of the forms a checkout asks for it:
+# `github.event.pull_request.head.sha`, `.head.ref`, `.head.repo.full_name`.
+_PR_HEAD = re.compile(r"github\.event\.pull_request\.head\.")
+_PR_TARGET = re.compile(r"\bpull_request_target\b")
 
 # Images GitHub has retired or announced the retirement of. Kept as an explicit
 # list rather than a "latest" rule, because `ubuntu-latest` is fine and pinning
@@ -136,6 +146,83 @@ def retired_runners(snapshot: RepoSnapshot) -> list[Finding]:
             detail=(
                 f"{described}. A retired image stops being provisioned on a date GitHub "
                 "sets, and every workflow asking for it fails that morning."
+            ),
+            evidence_url=f"{snapshot.url}/tree/{snapshot.default_branch}/.github/workflows",
+        )
+    ]
+
+
+def unscoped_token(snapshot: RepoSnapshot) -> list[Finding]:
+    """Workflows that leave the `GITHUB_TOKEN` at the repository's default scope.
+
+    Without a `permissions:` block the token gets whatever the repository or
+    organisation default is, which on an older repository is read-write on
+    everything. Scoping is satisfied either at the top of the file or on
+    **every** job: `cd-tag.yml` in this repository has no top-level block but
+    scopes each job, which is equally tight and must not be reported. One
+    unscoped job is enough to fire, because that job's token is the default.
+
+    A workflow triggered *only* by `workflow_call` is skipped: a called
+    workflow's token is whatever its caller grants, and leaving it unscoped is
+    the documented choice in `jay-withers/workflows` so callers stay in control.
+    The caller is where the scope belongs, and it is checked there.
+    """
+    unscoped = []
+    for workflow in snapshot.workflows:
+        if triggers(workflow.text) == {"workflow_call"}:
+            continue
+        if any(_TOP_PERMISSIONS.match(line) for line in workflow.text.splitlines()):
+            continue
+        found = jobs(workflow.text)
+        if found and all(job.scoped for job in found):
+            continue
+        unscoped.append(workflow.name)
+
+    if not unscoped:
+        return []
+    return [
+        Finding(
+            repo=snapshot.full_name,
+            check="workflows.unscoped_token",
+            severity="medium",
+            title=f"{len(unscoped)} workflow(s) with an unscoped GITHUB_TOKEN",
+            detail=(
+                f"{', '.join(sorted(unscoped))} set no `permissions:`, so the token takes "
+                "the repository default, which can be write access to everything. Add a "
+                "top-level `permissions: contents: read` and widen per job where needed."
+            ),
+            evidence_url=f"{snapshot.url}/tree/{snapshot.default_branch}/.github/workflows",
+        )
+    ]
+
+
+def pull_request_target_checkout(snapshot: RepoSnapshot) -> list[Finding]:
+    """`pull_request_target` workflows that touch the pull request's own code.
+
+    `pull_request_target` runs in the base repository's context, with its
+    secrets and a write-capable token, *for a pull request from anyone*. On its
+    own that is legitimate — labelling, commenting — and is not reported. Paired
+    with a reference to the PR's head it means checking out and running code the
+    author controls with those privileges, which is the classic "pwn request".
+    """
+    risky = [
+        workflow.name
+        for workflow in snapshot.workflows
+        if _PR_TARGET.search(workflow.text) and _PR_HEAD.search(workflow.text)
+    ]
+    if not risky:
+        return []
+    return [
+        Finding(
+            repo=snapshot.full_name,
+            check="workflows.pull_request_target_checkout",
+            severity="high",
+            title="pull_request_target workflow handles the pull request's own code",
+            detail=(
+                f"{', '.join(sorted(risky))} run on `pull_request_target` and reference "
+                "`github.event.pull_request.head`. That job holds the base repository's "
+                "secrets and token while working on code anyone can submit. Use "
+                "`pull_request` for anything that builds or runs the change."
             ),
             evidence_url=f"{snapshot.url}/tree/{snapshot.default_branch}/.github/workflows",
         )

@@ -10,7 +10,7 @@ from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
-from ..models import PullRequest, RepoSnapshot, Workflow
+from ..models import Branch, PullRequest, RepoSnapshot, Workflow
 
 
 def repo_snapshot(raw: dict[str, Any]) -> RepoSnapshot:
@@ -56,6 +56,7 @@ def pull_request(raw: dict[str, Any]) -> PullRequest:
         created_at=_timestamp(raw.get("createdAt")),
         url=raw.get("url", ""),
         draft=bool(raw.get("isDraft", False)),
+        updated_at=_timestamp(raw.get("updatedAt")),
     )
 
 
@@ -73,8 +74,9 @@ def merge_detail(snapshot: RepoSnapshot, detail: dict[str, Any] | None) -> RepoS
     workflows = detail.get("workflows") or {}
     releases = (detail.get("releases") or {}).get("nodes") or []
     release = releases[0] if releases else {}
-    prs = (detail.get("pullRequests") or {}).get("nodes") or []
-    open_prs = tuple(pull_request(raw) for raw in prs)
+    pr_page = detail.get("pullRequests") or {}
+    open_prs = tuple(pull_request(raw) for raw in pr_page.get("nodes") or [])
+    branches, branch_total = _branches(detail.get("branches"))
 
     return replace(
         snapshot,
@@ -94,10 +96,38 @@ def merge_detail(snapshot: RepoSnapshot, detail: dict[str, Any] | None) -> RepoS
         # fallback for a repository that is itself a module.
         terraform_lock=_blob_text(detail.get("tflock")) or _blob_text(detail.get("tflock_root")),
         open_prs=open_prs,
+        open_pr_total=_count(pr_page.get("totalCount")),
+        branches=branches,
+        branch_total=branch_total,
         renovate_pr_ever=_renovate_pr_ever(detail, open_prs),
         last_release=release.get("tagName"),
         last_release_at=_timestamp(release.get("publishedAt")),
     )
+
+
+def _branches(page: Any) -> tuple[tuple[Branch, ...] | None, int | None]:
+    """One page of branches and the true count, or `(None, None)` if absent.
+
+    Absent rather than empty matters: a repository always has at least its
+    default branch, so a missing field means the query did not answer.
+    """
+    if not isinstance(page, dict):
+        return None, None
+    branches = tuple(
+        Branch(
+            name=node.get("name", ""),
+            committed_at=_timestamp((node.get("target") or {}).get("committedDate")),
+            has_open_pr=(_count((node.get("associatedPullRequests") or {}).get("totalCount")) or 0)
+            > 0,
+        )
+        for node in page.get("nodes") or []
+    )
+    return branches, _count(page.get("totalCount"))
+
+
+def _count(raw: Any) -> int | None:
+    """A GraphQL `totalCount`, or None where it is missing."""
+    return raw if isinstance(raw, int) else None
 
 
 def _renovate_pr_ever(detail: dict[str, Any], open_prs: tuple[PullRequest, ...]) -> bool | None:
