@@ -269,6 +269,38 @@ and nothing else. They are deliberately **not** sent to the triage prompt —
 `llm._user_prompt` sends `workflow_names` — since a dozen workflow files per
 repository would dominate it.
 
+## Workflow, container and housekeeping checks
+
+**`workflows.unscoped_token` accepts `permissions:` on every job as well as at
+the top.** This repository's own `cd-tag.yml` has no top-level block, but every
+job in it is scoped, which is just as tight. A check that only looked at column
+0 would report the estate's own template. A single unscoped job is enough to
+fire, because that job's token falls back to the repository default. A
+workflow triggered **only** by `workflow_call` is skipped. A called workflow's
+token is whatever its caller grants, and `jay-withers/workflows` leaves them
+unscoped on purpose. The first survey of the estate reported three of them
+until this exemption was added. Job
+parsing is in `checks/workflow_text.py`, shared with `estate`. Extend it there
+instead of writing a second regex.
+
+`workflows.pull_request_target_checkout` fires only when the workflow **also**
+references `github.event.pull_request.head`. A bare `pull_request_target` is
+legitimate (labelling, commenting). Running the author's code with the base
+repository's secrets is not.
+
+`container.*` reads the **root `Dockerfile` only**, because that is the only
+one fetched. Most of the estate passes both checks already, so they guard
+against regressions in repositories that did not start from the template.
+
+`hygiene.abandoned_prs` excludes Renovate's pull requests, which belong to
+`stalled_prs`. That keeps any one pull request from being reported twice. It is
+measured from `updatedAt`, not creation.
+
+`branches` is a **tri-state**, like `in_catalogue`. `None` (the detail query did
+not answer) stays silent. The page holds 50 refs, because GraphQL scores
+*potential* nodes across the ten-repository batch. `branch_total` lets the check
+say "at least" when the page does not hold every branch.
+
 ## Onboarded is not activated
 
 `renovate.never_opened_a_pr` exists because the other four Renovate checks all

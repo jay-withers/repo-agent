@@ -227,3 +227,53 @@ def test_the_detail_query_asks_for_closed_pull_request_history() -> None:
     """Pinned: without this the check can only ever answer None."""
     assert "closedPullRequests" in github_client._REPO_FRAGMENT
     assert "states: [MERGED, CLOSED]" in github_client._REPO_FRAGMENT
+
+
+def test_the_detail_query_asks_for_branches_and_pr_activity() -> None:
+    """Pinned: without these the branch and abandoned-PR checks are silent."""
+    assert 'refs(refPrefix: "refs/heads/"' in github_client._REPO_FRAGMENT
+    assert "updatedAt" in github_client._REPO_FRAGMENT
+
+
+def test_merge_folds_branches_and_pr_activity_in() -> None:
+    detail = _detail(
+        pullRequests={
+            "totalCount": 40,
+            "nodes": [
+                {
+                    "number": 1,
+                    "title": "x",
+                    "author": {"login": "jay"},
+                    "createdAt": "2026-01-01T00:00:00Z",
+                    "updatedAt": "2026-02-01T00:00:00Z",
+                }
+            ],
+        },
+        branches={
+            "totalCount": 60,
+            "nodes": [
+                {
+                    "name": "old-work",
+                    "target": {"committedDate": "2026-01-01T00:00:00Z"},
+                    "associatedPullRequests": {"totalCount": 1},
+                },
+                # A tag-like ref whose target is not a commit has no date.
+                {"name": "odd", "target": {}, "associatedPullRequests": None},
+            ],
+        },
+    )
+    merged = parse.merge_detail(snapshot(), detail)
+
+    assert merged.open_pr_total == 40
+    assert merged.open_prs[0].updated_at is not None
+    assert merged.branch_total == 60
+    assert [b.name for b in merged.branches or ()] == ["old-work", "odd"]
+    assert merged.branches is not None
+    assert merged.branches[0].has_open_pr is True
+    assert merged.branches[1].committed_at is None
+    assert merged.branches[1].has_open_pr is False
+
+
+def test_missing_branches_read_as_unknown_not_empty() -> None:
+    """A repository always has a default branch, so absence means no answer."""
+    assert parse.merge_detail(snapshot(), _detail()).branches is None

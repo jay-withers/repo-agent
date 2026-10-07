@@ -16,6 +16,20 @@ from ..models import Finding, RepoSnapshot
 # that simply works — do not trip it.
 STALE_PUSH_DAYS = 180
 
+# A human pull request with no activity for a month has stopped being work in
+# progress. Drafts get three: a draft is a declared parking spot, and reporting
+# one after four weeks would teach people to stop opening them.
+ABANDONED_PR_DAYS = 30
+ABANDONED_DRAFT_DAYS = 90
+
+# A branch whose head is three months old, with no pull request open from it, is
+# either merged-and-not-deleted or forgotten work. Bot branches are excluded:
+# Renovate and Dependabot create and delete their own.
+STALE_BRANCH_DAYS = 90
+BOT_BRANCH_PREFIXES = ("renovate/", "dependabot/")
+# Enough names to act on without turning one finding into a list.
+MAX_NAMED = 10
+
 
 def no_readme(snapshot: RepoSnapshot) -> list[Finding]:
     """No README at the repository root."""
@@ -119,6 +133,97 @@ def stale(snapshot: RepoSnapshot) -> list[Finding]:
             ),
             evidence_url=snapshot.url,
             age_days=age,
+        )
+    ]
+
+
+def abandoned_prs(snapshot: RepoSnapshot) -> list[Finding]:
+    """Human pull requests nobody has touched in weeks.
+
+    Renovate's own pull requests are `renovate.stalled_prs`'s business and are
+    excluded here, so the two checks never report the same pull request.
+    Measured from the last update rather than creation: a long-running pull
+    request someone is still pushing to is not abandoned.
+    """
+    abandoned = []
+    for pr in snapshot.open_prs:
+        if pr.is_renovate:
+            continue
+        age = _age_days(pr.updated_at or pr.created_at)
+        threshold = ABANDONED_DRAFT_DAYS if pr.draft else ABANDONED_PR_DAYS
+        if age is not None and age >= threshold:
+            abandoned.append((age, pr))
+
+    if not abandoned:
+        return []
+    abandoned.sort(key=lambda item: item[0], reverse=True)
+    oldest = abandoned[0][0]
+    named = ", ".join(
+        f"#{pr.number} {pr.title!r}{' (draft)' if pr.draft else ''} by {pr.author}, idle {age}d"
+        for age, pr in abandoned[:MAX_NAMED]
+    )
+    # The page is the oldest open pull requests first, so anything beyond it is
+    # newer and less likely to qualify — but not certainly, so say so.
+    truncated = snapshot.open_pr_total is not None and snapshot.open_pr_total > len(
+        snapshot.open_prs
+    )
+    return [
+        Finding(
+            repo=snapshot.full_name,
+            check="hygiene.abandoned_prs",
+            severity="low",
+            title=f"{'at least ' if truncated else ''}{len(abandoned)} abandoned pull request(s)",
+            detail=(
+                f"{named}. Merge, close or mark as draft; an open pull request nobody is "
+                "working on goes on conflicting with everything that does merge."
+            ),
+            evidence_url=f"{snapshot.url}/pulls",
+            age_days=oldest,
+        )
+    ]
+
+
+def stale_branches(snapshot: RepoSnapshot) -> list[Finding]:
+    """Branches with old heads and no pull request open from them.
+
+    Silent where branches could not be read (`None`), rather than reporting a
+    clean bill on a list nobody fetched.
+    """
+    if snapshot.branches is None:
+        return []
+
+    stale_found = []
+    for branch in snapshot.branches:
+        if branch.name == snapshot.default_branch or branch.has_open_pr:
+            continue
+        if branch.name.startswith(BOT_BRANCH_PREFIXES):
+            continue
+        age = _age_days(branch.committed_at)
+        if age is not None and age >= STALE_BRANCH_DAYS:
+            stale_found.append((age, branch.name))
+
+    if not stale_found:
+        return []
+    stale_found.sort(reverse=True)
+    truncated = snapshot.branch_total is not None and snapshot.branch_total > len(snapshot.branches)
+    named = ", ".join(f"{name} ({age}d)" for age, name in stale_found[:MAX_NAMED])
+    more = len(stale_found) - MAX_NAMED
+    return [
+        Finding(
+            repo=snapshot.full_name,
+            check="hygiene.stale_branches",
+            severity="low",
+            title=(
+                f"{'at least ' if truncated else ''}{len(stale_found)} stale branch(es) "
+                "with no open pull request"
+            ),
+            detail=(
+                f"{named}{f' and {more} more' if more > 0 else ''}. Delete them if merged, "
+                "or open a pull request if the work is still wanted. Enabling "
+                "`delete_branch_on_merge` in github-repos stops the merged ones recurring."
+            ),
+            evidence_url=f"{snapshot.url}/branches/stale",
+            age_days=stale_found[0][0],
         )
     ]
 

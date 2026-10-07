@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 
 from repoagent import checks
 from repoagent.checks import hygiene, renovate
-from tests.factories import renovate_pr, snapshot
+from tests.factories import branch, human_pr, renovate_pr, snapshot
 
 
 def _checks(findings: list) -> set[str]:
@@ -294,3 +294,79 @@ def test_finding_ids_are_stable_across_runs() -> None:
     second = checks.run_all(snapshot(renovate_config=None))
 
     assert [f.id for f in first] == [f.id for f in second]
+
+
+# --- human pull requests and branches ----------------------------------------
+
+
+def test_an_idle_human_pull_request_is_abandoned() -> None:
+    findings = hygiene.abandoned_prs(snapshot(open_prs=(human_pr(days_idle=45),)))
+
+    assert len(findings) == 1
+    assert findings[0].check == "hygiene.abandoned_prs"
+    assert findings[0].severity == "low"
+    assert findings[0].age_days == 45
+    assert "#7" in findings[0].detail
+
+
+def test_renovate_pull_requests_are_stalled_prs_business_not_this_one() -> None:
+    assert hygiene.abandoned_prs(snapshot(open_prs=(renovate_pr(days_old=60),))) == []
+
+
+def test_activity_not_creation_decides_abandonment() -> None:
+    """A long-running pull request someone is still pushing to is fine."""
+    pr = human_pr(days_idle=2, created_at=_days_ago(200))
+
+    assert hygiene.abandoned_prs(snapshot(open_prs=(pr,))) == []
+
+
+def test_creation_is_the_fallback_where_activity_is_missing() -> None:
+    pr = human_pr(updated_at=None, created_at=_days_ago(45))
+
+    assert len(hygiene.abandoned_prs(snapshot(open_prs=(pr,)))) == 1
+
+
+def test_drafts_get_longer_before_they_count_as_abandoned() -> None:
+    assert hygiene.abandoned_prs(snapshot(open_prs=(human_pr(days_idle=45, draft=True),))) == []
+    assert (
+        len(hygiene.abandoned_prs(snapshot(open_prs=(human_pr(days_idle=100, draft=True),)))) == 1
+    )
+
+
+def test_a_truncated_pull_request_page_says_at_least() -> None:
+    findings = hygiene.abandoned_prs(snapshot(open_prs=(human_pr(days_idle=45),), open_pr_total=31))
+
+    assert findings[0].title.startswith("at least")
+
+
+def test_an_old_branch_with_no_pull_request_is_stale() -> None:
+    findings = hygiene.stale_branches(
+        snapshot(branches=(branch("main", 3), branch("old-idea", 120)))
+    )
+
+    assert len(findings) == 1
+    assert findings[0].check == "hygiene.stale_branches"
+    assert "old-idea" in findings[0].detail
+    assert findings[0].age_days == 120
+
+
+def test_unread_branches_are_silent() -> None:
+    assert hygiene.stale_branches(snapshot(branches=None)) == []
+
+
+def test_bot_branches_the_default_branch_and_branches_with_a_pr_are_excluded() -> None:
+    branches = (
+        branch("main", 400),
+        branch("renovate/httpx-0.x", 400),
+        branch("dependabot/pip/httpx", 400),
+        branch("in-review", 400, has_open_pr=True),
+        branch("recent", 10),
+    )
+
+    assert hygiene.stale_branches(snapshot(branches=branches)) == []
+
+
+def test_a_truncated_branch_page_says_at_least() -> None:
+    findings = hygiene.stale_branches(snapshot(branches=(branch("old", 120),), branch_total=51))
+
+    assert findings[0].title.startswith("at least")

@@ -115,6 +115,7 @@ _REPO_FRAGMENT = """
         url
         isDraft
         createdAt
+        updatedAt
         author { login }
       }
     }
@@ -134,6 +135,19 @@ _REPO_FRAGMENT = """
     ) {
       totalCount
       nodes { author { login } }
+    }
+    # One page of branches for `hygiene.stale_branches`. Fifty rather than a
+    # hundred because GraphQL scores the *potential* node count — 50 refs, each
+    # with an open-PR count, across a ten-repository batch is comfortably
+    # inside the limit; `totalCount` lets the check say "at least" when it is
+    # not the whole list.
+    branches: refs(refPrefix: "refs/heads/", first: 50) {
+      totalCount
+      nodes {
+        name
+        target { ... on Commit { committedDate } }
+        associatedPullRequests(states: OPEN) { totalCount }
+      }
     }
     releases(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) {
       nodes { tagName publishedAt }
