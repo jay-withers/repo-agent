@@ -52,14 +52,18 @@ def send(subject: str, html: str, text: str, client: Any = None) -> MailResult:
     # that names the address rather than the character, and curly quotes are
     # invisible in `az keyvault secret show` output. market-agent lost a day's
     # summary to exactly this, so it is worth catching before the request.
+    #
+    # The address itself is never logged or returned: it lives in Key Vault
+    # precisely to stay out of anything public or shared, and both the log and
+    # the result end up in the shared Log Analytics workspace. Which recipient
+    # and which character are enough to find a curly quote.
     addresses = [address.strip() for address in recipient.split(",") if address.strip()]
-    for address in addresses:
-        if not address.isascii():
-            logger.warning("DIGEST-EMAIL-TO contains a non-ASCII character: %r", address)
-            return MailResult(
-                status="failed",
-                error=f"recipient is not plain ASCII: {address!r}",
-            )
+    for number, address in enumerate(addresses, start=1):
+        bad = next((char for char in address if not char.isascii()), None)
+        if bad is not None:
+            detail = f"recipient {number} of {len(addresses)} contains U+{ord(bad):04X}"
+            logger.warning("DIGEST-EMAIL-TO is not plain ASCII: %s", detail)
+            return MailResult(status="failed", error=f"recipient is not plain ASCII: {detail}")
 
     try:
         payload = post_json(
