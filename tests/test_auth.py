@@ -116,3 +116,22 @@ def test_unparseable_expiry_does_not_fail_the_run() -> None:
     )
     # A token we cannot date is still a usable token.
     assert auth.token(client=client) == "ghs_x"
+
+
+def test_permitted_reads_the_tokens_own_grant() -> None:
+    client = sequence_client(
+        [
+            httpx.Response(200, json=[{"id": 7}]),
+            httpx.Response(
+                201,
+                json={
+                    "token": "ghs_first",
+                    "expires_at": "2099-01-01T00:00:00Z",
+                    "permissions": {"contents": "read", "security_events": "read"},
+                },
+            ),
+        ]
+    )
+
+    assert auth.permitted("security_events", client=client)
+    assert not auth.permitted("administration", client=client)

@@ -172,15 +172,35 @@ change to either repository.
 exemption nobody can see is one nobody revisits, and a topic added by mistake
 would otherwise silently drop a repository out of the digest for ever.
 
-## Security scanning: considered, not built
+## Security scanning: CodeQL read, the rest not
 
-Reading **Dependabot, secret scanning and code scanning alerts** was designed and
-deliberately not built. Surveyed across the estate first: all 13 repositories
-already run gitleaks in pre-commit, every Terraform repository runs Checkov, and
-12 of 13 run pre-commit in CI *and* have `pre-commit / Pre-commit` as a required
-check. A "is a scanner configured" check would have been silent from the day it
-shipped, and the alert APIs need three new App permissions plus a re-approved
-installation.
+**`security.open_code_scanning_alerts` reads open CodeQL alerts.** The CodeQL
+workflow is green whatever it finds and results land in a Security tab nobody
+visits, so an alert can sit open for months behind a wall of passing checks.
+That is exactly the "configured but not working" gap this agent exists for.
+
+- **REST, per repository**, because GraphQL does not expose code scanning. One
+  page of 100, `state=open&tool_name=CodeQL`; a full page says "at least".
+- **Needs the App's `Code scanning alerts: read` (`security_events`)
+  permission**, which means an accepted re-approval on the installation.
+  `auth.permitted` reads the token's own `permissions` grant and the fetch is
+  skipped outright without it — probing would 403, and `fetch` retries 403 as a
+  secondary rate limit, costing seconds per repository to learn nothing.
+- **`code_scanning_alerts` is a tri-state.** `None` (no permission, a 404 because
+  CodeQL has never run, any failure) stays silent; `()` is CodeQL having run and
+  found nothing. A repository without CodeQL is not reported as clean.
+- **Fetched independently of the detail query**, so a GraphQL failure does not
+  cost the alerts, nor the reverse.
+- **One finding per repository**, graded by the worst alert, naming rule ids and
+  counts and **never file paths** — findings go to DeepSeek, and the location of
+  an unfixed vulnerability is the part to keep out of that prompt.
+  `test_the_detail_never_names_a_file` pins it.
+
+**Dependabot and secret scanning alerts are still not read.** Surveyed across the
+estate first: all 13 repositories already run gitleaks in pre-commit, every
+Terraform repository runs Checkov, and 12 of 13 run pre-commit in CI *and* have
+`pre-commit / Pre-commit` as a required check. Each would need another App
+permission and re-approval.
 
 **The residual gap, recorded rather than argued:** gitleaks in pre-commit is a
 *local* control. It runs only for people who have run `pre-commit install`, and
@@ -487,7 +507,7 @@ interpolated: `") { evil }` is a legal GitHub repository name.
 
 **`branchProtectionRules` and `vulnerabilityAlerts` are deliberately absent**
 from that query. Both need permissions beyond the App's read-only
-metadata/contents/pull-requests set, and GraphQL reports a permission failure
+metadata/contents/pull-requests/code-scanning set, and GraphQL reports a permission failure
 as an `errors` entry — which `fetch.graphql` turns into a `FetchError` that
 fails the whole batch, not just the field. Adding either means widening the App
 first.

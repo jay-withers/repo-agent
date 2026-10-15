@@ -158,6 +158,21 @@ def _snapshots(
     # Archived repositories are skipped by `checks.run_all` anyway, so fetching
     # their detail is tokens and rate limit spent on findings nobody will see.
     wanted = [repo.full_name for repo in repos if not repo.archived]
+
+    # Before the detail query and independent of it: a GraphQL failure must not
+    # cost the run its code scanning alerts, nor the reverse.
+    try:
+        raw_alerts = github_client.code_scanning_alerts(wanted, client=session)
+    except Exception as exc:
+        logger.warning("code scanning alerts unavailable, continuing without them: %s", exc)
+        raw_alerts = {}
+    repos = [
+        replace(
+            repo, code_scanning_alerts=parse.code_scanning_alerts(raw_alerts.get(repo.full_name))
+        )
+        for repo in repos
+    ]
+
     # Deliberately broad. Anything this query can raise — a transport error, a
     # GraphQL node-limit rejection, a shape nobody anticipated — should cost the
     # run its detail and not its digest. The REST list alone still reports every

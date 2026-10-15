@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from repoagent.models import Branch, PullRequest, RepoSnapshot, Workflow
+from repoagent.models import Branch, CodeScanningAlert, PullRequest, RepoSnapshot, Workflow
 
 HEALTHY_RENOVATE = '{"extends": ["github>jay-withers/renovate"], "packageRules": []}'
 
@@ -82,6 +82,8 @@ def snapshot(**overrides: object) -> RepoSnapshot:
         "branches": (branch("main", days_old=3),),
         # Healthy means Renovate has actually delivered something here.
         "renovate_pr_ever": True,
+        # CodeQL has run and found nothing.
+        "code_scanning_alerts": (),
         "last_release": "v1.0.0",
         "last_release_at": datetime.now(UTC) - timedelta(days=10),
     }
@@ -121,4 +123,17 @@ def branch(name: str = "feature", days_old: int = 1, has_open_pr: bool = False) 
         name=name,
         committed_at=datetime.now(UTC) - timedelta(days=days_old),
         has_open_pr=has_open_pr,
+    )
+
+
+def code_alert(
+    rule: str = "py/path-injection", severity: str = "high", days_old: int = 10, number: int = 1
+) -> CodeScanningAlert:
+    """An open CodeQL alert raised `days_old` days ago."""
+    return CodeScanningAlert(
+        number=number,
+        rule=rule,
+        severity=severity,
+        created_at=datetime.now(UTC) - timedelta(days=days_old),
+        url=f"https://github.com/jay-withers/widget/security/code-scanning/{number}",
     )

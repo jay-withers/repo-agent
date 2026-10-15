@@ -72,6 +72,7 @@ catch elsewhere.
 | `estate.unenforced_check` | medium | A workflow gates every PR, but the catalogue does not require its context |
 | `estate.incomplete_terraform_lock` | high | Providers locked for fewer platforms than run Terraform |
 | `estate.not_shared_preset` | low | Renovate config does not extend the estate's shared preset |
+| `security.open_code_scanning_alerts` | high/medium/low | Open CodeQL alerts, graded by the worst; silent where code scanning has never run or the App lacks the permission |
 | `workflows.unpinned_actions` | high | Third-party action referenced by a mutable tag |
 | `workflows.unpinned_first_party_actions` | low | GitHub-owned action on a tag |
 | `workflows.retired_runners` | medium | Runner image GitHub has withdrawn or will |
@@ -207,8 +208,10 @@ installation token is scoped to the repositories the App is installed on and
 needs no diary entry to rotate.
 
 Create it under your account with these **read-only** permissions — Metadata,
-Contents, Issues, Pull requests, Checks, Actions, Administration — and install it
-on **all repositories**, so a new repo is covered without a config change.
+Contents, Issues, Pull requests, Checks, Actions, Administration, Code scanning
+alerts — and install it on **all repositories**, so a new repo is covered without
+a config change. Code scanning alerts is optional: without it the CodeQL check is
+silent and nothing else changes.
 
 Then record the App ID and download the private key. The installation ID is
 **not** configured: it is looked up from the App's own credentials, which is one
@@ -275,7 +278,7 @@ pulls it:
 1. Apply `azure-container-apps` (dev).
 2. Create the GitHub App **and install it** — two separate actions, and the
    second is easy to miss. Needs `Metadata`, `Contents` and `Pull requests`,
-   all read-only, and **All repositories** so a new repo is covered with no
+   all read-only, plus read-only `Code scanning alerts` for the CodeQL check, and **All repositories** so a new repo is covered with no
    config change. Changing permissions on an existing installation raises a
    request that has to be accepted before it takes effect.
 3. Merge to `main` here — `cd-tag` mints a version, `cd-publish` pushes the image.

@@ -63,6 +63,22 @@ class Workflow:
 
 
 @dataclass(frozen=True)
+class CodeScanningAlert:
+    """One open CodeQL alert, as much of it as `security.open_code_scanning_alerts` needs.
+
+    `severity` is the rule's security severity (`critical`/`high`/`medium`/`low`)
+    where it has one, and its plain severity (`error`/`warning`/`note`) where it
+    does not — a quality query carries no security rating.
+    """
+
+    number: int
+    rule: str
+    severity: str
+    created_at: datetime | None = None
+    url: str = ""
+
+
+@dataclass(frozen=True)
 class RepoSnapshot:
     """Everything the checks are allowed to see about one repository.
 
@@ -129,6 +145,12 @@ class RepoSnapshot:
     renovate_pr_ever: bool | None = None
     last_release: str | None = None
     last_release_at: datetime | None = None
+    # Open CodeQL alerts, one page of them. Fetched over REST rather than in the
+    # detail query, because GraphQL does not expose code scanning at all. None
+    # when the question could not be answered — the App lacks the permission,
+    # code scanning has never run here, or the request failed — which must
+    # never read as "no open alerts".
+    code_scanning_alerts: tuple[CodeScanningAlert, ...] | None = None
 
     @property
     def renovate_prs(self) -> tuple[PullRequest, ...]:

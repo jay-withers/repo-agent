@@ -118,7 +118,7 @@ staleness, catalogue membership, Terraform lock platforms, action pinning, \
 runner versions, shared Renovate preset, required checks nothing reports, \
 pull request checks the catalogue does not require, workflow token permissions, \
 pull_request_target misuse, Dockerfile base image pinning and USER, abandoned \
-pull requests, stale branches.
+pull requests, stale branches, open CodeQL code scanning alerts.
 8. Be specific to what you were shown. "Add tests" is worthless; "the Dockerfile \
 installs build tools into the runtime stage" is worth reading.
 9. At most four. Fewer is better. An empty list is a fine answer.

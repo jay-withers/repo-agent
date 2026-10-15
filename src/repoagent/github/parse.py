@@ -10,7 +10,7 @@ from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
-from ..models import Branch, PullRequest, RepoSnapshot, Workflow
+from ..models import Branch, CodeScanningAlert, PullRequest, RepoSnapshot, Workflow
 
 
 def repo_snapshot(raw: dict[str, Any]) -> RepoSnapshot:
@@ -58,6 +58,31 @@ def pull_request(raw: dict[str, Any]) -> PullRequest:
         draft=bool(raw.get("isDraft", False)),
         updated_at=_timestamp(raw.get("updatedAt")),
     )
+
+
+def code_scanning_alerts(raw: list[dict[str, Any]] | None) -> tuple[CodeScanningAlert, ...] | None:
+    """Build alerts from one `/code-scanning/alerts` page, keeping None as None."""
+    if raw is None:
+        return None
+    alerts = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        rule = entry.get("rule") or {}
+        alerts.append(
+            CodeScanningAlert(
+                number=int(entry.get("number", 0)),
+                rule=rule.get("id") or rule.get("name") or "unknown",
+                # Security severity first: it is what a person triages by, and
+                # a plain `error` on a security query says less than `critical`.
+                severity=(
+                    rule.get("security_severity_level") or rule.get("severity") or ""
+                ).lower(),
+                created_at=_timestamp(entry.get("created_at")),
+                url=entry.get("html_url", ""),
+            )
+        )
+    return tuple(alerts)
 
 
 def merge_detail(snapshot: RepoSnapshot, detail: dict[str, Any] | None) -> RepoSnapshot:

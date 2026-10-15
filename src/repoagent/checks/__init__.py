@@ -17,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from ..models import Finding, RepoSnapshot
-from . import container, estate, hygiene, renovate, workflows
+from . import container, estate, hygiene, renovate, security, workflows
 
 Check = Callable[[RepoSnapshot], list[Finding]]
 
@@ -45,6 +45,9 @@ ALL: tuple[Check, ...] = (
     estate.unenforced_check,
     estate.incomplete_terraform_lock,
     estate.not_shared_preset,
+    # A vulnerability CodeQL has already found is a known defect in running
+    # code, which outranks a workflow that merely could be exploited.
+    security.open_code_scanning_alerts,
     # A privileged token running untrusted code is the worst thing a workflow
     # file can say, so it leads the workflow checks.
     workflows.pull_request_target_checkout,
