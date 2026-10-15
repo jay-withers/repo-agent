@@ -47,7 +47,11 @@ TOKEN_REFRESH_MARGIN_SECONDS = 120
 
 # Module-level rather than @lru_cache because expiry has to be *checked*, which
 # a cache keyed on the arguments cannot do. Reset in tests.
-_cached: tuple[str, datetime] | None = None
+#
+# The third element is the permission map GitHub granted the token, kept so a
+# caller can ask before making a request that would only be refused — see
+# `permitted`.
+_cached: tuple[str, datetime, dict[str, str]] | None = None
 
 
 def app_jwt(now: float | None = None) -> str:
@@ -109,7 +113,7 @@ def token(client: httpx.Client | None = None, now: datetime | None = None) -> st
 
     moment = now or datetime.now(UTC)
     if _cached is not None:
-        cached_token, expires_at = _cached
+        cached_token, expires_at, _ = _cached
         if expires_at - timedelta(seconds=TOKEN_REFRESH_MARGIN_SECONDS) > moment:
             return cached_token
 
@@ -123,9 +127,27 @@ def token(client: httpx.Client | None = None, now: datetime | None = None) -> st
     )
 
     expires_at = _parse_expiry(payload.get("expires_at"), moment)
-    _cached = (payload["token"], expires_at)
+    permissions = payload.get("permissions")
+    _cached = (
+        payload["token"],
+        expires_at,
+        {str(k): str(v) for k, v in permissions.items()} if isinstance(permissions, dict) else {},
+    )
     logger.info("minted installation token, expires %s", expires_at.isoformat())
     return payload["token"]
+
+
+def permitted(name: str, client: httpx.Client | None = None) -> bool:
+    """Whether the installation token carries `name` at any access level.
+
+    Read from the token's own grant rather than probed: an API the App may not
+    call answers 403, which `fetch` retries as a secondary rate limit, so asking
+    it once per repository would spend seconds per repository learning nothing.
+    A permission added to the App only appears here once the installation has
+    accepted it.
+    """
+    token(client=client)
+    return _cached is not None and name in _cached[2]
 
 
 def reset_cache() -> None:

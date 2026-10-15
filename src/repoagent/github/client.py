@@ -233,6 +233,61 @@ def repo_details(
     return details
 
 
+# The App permission GitHub calls "Code scanning alerts" in its settings page and
+# `security_events` everywhere else.
+CODE_SCANNING_PERMISSION = "security_events"
+
+
+def code_scanning_alerts(
+    full_names: list[str],
+    client: httpx.Client | None = None,
+) -> dict[str, list[dict[str, Any]] | None]:
+    """Open CodeQL alerts for each repository, keyed by `owner/name`.
+
+    REST, one request per repository, because GraphQL does not expose code
+    scanning at all. Sequential like everything else here.
+
+    Returns an empty mapping when the App has not been granted the permission,
+    and None for any one repository whose alerts could not be read — a 404 is
+    "code scanning has never run here", which is not the same fact as "no
+    alerts". Either way the check stays silent rather than reporting a clean
+    repository it never saw.
+
+    One page of 100, unpaginated: past that the finding says "at least", and a
+    repository with a hundred open alerts has a problem the exact number does
+    not change.
+    """
+    if not auth.permitted(CODE_SCANNING_PERMISSION, client=client):
+        logger.info(
+            "App lacks the %s permission; not reading code scanning alerts",
+            CODE_SCANNING_PERMISSION,
+        )
+        return {}
+
+    alerts: dict[str, list[dict[str, Any]] | None] = {}
+    for full_name in full_names:
+        try:
+            page = get_json(
+                f"{settings().github_api_url}/repos/{full_name}/code-scanning/alerts",
+                headers=auth.auth_headers(client=client),
+                params={
+                    "state": "open",
+                    "tool_name": "CodeQL",
+                    "per_page": PAGE_SIZE,
+                },
+                client=client,
+            )
+        except Exception as exc:
+            # Logged at info, not warning: a 404 from a repository that has never
+            # run CodeQL is the normal case for most of an estate.
+            logger.info("no code scanning alerts for %s: %s", full_name, exc)
+            alerts[full_name] = None
+            continue
+        alerts[full_name] = page if isinstance(page, list) else None
+
+    return alerts
+
+
 # Where the estate's catalogue of every repository lives. Read through the same
 # installation token as everything else — the App is installed on this repository
 # too, so it needs no extra permission.
