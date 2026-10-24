@@ -645,7 +645,7 @@ check that never reports leaves a PR pending for ever rather than failing it.
   `git describe --tags --abbrev=0 HEAD^` rather than the push's own range — so
   an unreleased change carried by a push that minted no tag is still picked up
   later. A release version with no image published under it is expected, not a
-  bug.
+  bug. `cd-publish`'s `deploy` job then runs `make deploy IMAGE_TAG=<release>` against dev through the shared `container-apps-deploy.yml` (OIDC in the `dev` GitHub environment; `cd-tag`'s `publish` job grants `id-token: write` for it). An apply that recreates a workload does not trigger it: re-run `cd-publish` with `workflow_dispatch` and the current tag.
 - **A green publish is not evidence the tags are right — check the registry.**
   Both images are pushed under the release `vX.Y.Z` and the commit's short SHA,
   and neither tag is ever moved; Container Apps creates a revision only when
