@@ -288,7 +288,8 @@ pulls it:
    `org.opencontainers.image.source` label in the Dockerfile is what earns.
    Worth confirming rather than assuming:
    `gh api user/packages/container/repo-agent%2Frepoagent --jq .visibility`
-5. `make apply ENV=dev`.
+5. `make apply ENV=dev`. After this first apply, `cd-terraform` applies dev on
+   every merge that touches Terraform.
 6. `make secrets`, and run what it prints.
 7. `make start`, then check the digest arrived.
 
@@ -310,5 +311,12 @@ leaves the pull request pending for ever rather than failing it.
 `ci-terraform` plans `dev` only, unlike the other Terraform repos. This
 configuration resolves the shared environment with a data source, so a plan
 against an environment the platform was never applied to fails at plan time.
+The plan runs in the `dev` GitHub environment, which holds the Azure login
+variables, and is posted as a PR comment.
+
+`cd-terraform` applies dev on every merge that touches Terraform, with the same
+shared workflow. A change that adds or replaces a role assignment is the
+exception: the pipeline's identity is only Contributor, so apply that one
+locally with `make apply ENV=dev`.
 
 Generated input/output reference: [`terraform/README.md`](terraform/README.md).
