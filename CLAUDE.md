@@ -606,10 +606,12 @@ there so every consuming repo picks it up.
 Status check contexts are namespaced `<caller job id> / <reusable job name>`.
 **Read them off `gh pr checks` rather than inferring them.** The required
 checks — set in `github-repos`, not here — are `pre-commit / Pre-commit`,
-`test / Test`, `terraform / Terraform` and `terraform-plan`.
-`ci-container-build`'s `build (repoagent)` is deliberately **not** required: it
-is filtered on its trigger, so a docs-only PR never runs it, and a required
-check that never reports leaves a PR pending for ever rather than failing it.
+`test / Test`, `terraform / Terraform`, `terraform-plan` and `container-build`.
+`ci-container-build`'s **`container-build`** gate is a required check. The
+workflow runs on every pull request; a `changes` job decides whether the image
+build runs, and the gate passes when it was skipped and fails when it failed. It
+used to be path-filtered on the trigger and so could not be required, which let
+Renovate auto-merge a Python 3.15 base image that could not build.
 
 - **`extras: dev` on ci-python is the input that matters.** pytest is an
   *extra*, not a dependency group, and `uv run` installs groups but not extras

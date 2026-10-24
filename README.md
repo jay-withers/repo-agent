@@ -312,9 +312,11 @@ commit SHA with the tag as a comment. Because they are reusable-workflow calls,
 the status check contexts are namespaced `<caller job id> / <reusable job name>`
 — read them off `gh pr checks` rather than inferring them.
 
-`ci-container-build` is **not** a required check: it is path filtered, so a
-docs-only pull request never runs it, and a required check that never reports
-leaves the pull request pending for ever rather than failing it.
+`ci-container-build`'s **`container-build`** gate is a required check. The
+workflow runs on every pull request; a `changes` job decides whether the image
+build runs, and the gate passes when it was skipped and fails when it failed. It
+used to be path-filtered on the trigger and so could not be required, which let
+Renovate auto-merge a Python 3.15 base image that could not build.
 
 `ci-terraform` plans `dev` only, unlike the other Terraform repos. This
 configuration resolves the shared environment with a data source, so a plan
