@@ -8,6 +8,13 @@ resource "azurerm_container_app_job" "scan" {
   name                         = module.naming_scan.container_app_job.name
   container_app_environment_id = data.azurerm_container_app_environment.platform.id
   resource_group_name          = azurerm_resource_group.this.name
+
+  # The shared environment is Consumption-only. Stated explicitly rather than
+  # left to the provider default, because the API reports it back and leaving
+  # it unset made every plan propose clearing it, which, now that any planned
+  # change needs approval, blocked every Terraform PR. gym-log and career set
+  # it the same way.
+  workload_profile_name = "Consumption"
   # Jobs require a location explicitly; container apps inherit the
   # environment's. It must match the environment's region.
   location = azurerm_resource_group.this.location
