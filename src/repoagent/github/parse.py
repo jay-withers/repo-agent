@@ -57,6 +57,11 @@ def pull_request(raw: dict[str, Any]) -> PullRequest:
         url=raw.get("url", ""),
         draft=bool(raw.get("isDraft", False)),
         updated_at=_timestamp(raw.get("updatedAt")),
+        labels=tuple(
+            node["name"]
+            for node in ((raw.get("labels") or {}).get("nodes") or [])
+            if node and node.get("name")
+        ),
     )
 
 

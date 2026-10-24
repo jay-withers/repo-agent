@@ -17,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from ..models import Finding, RepoSnapshot
-from . import container, estate, hygiene, renovate, security, workflows
+from . import container, estate, hygiene, renovate, security, terraform, workflows
 
 Check = Callable[[RepoSnapshot], list[Finding]]
 
@@ -30,6 +30,10 @@ ALL: tuple[Check, ...] = (
     # Above `stalled_prs`: a repository that has never had an update at all
     # outranks one whose updates have stopped moving.
     renovate.never_opened_a_pr,
+    # Above `stalled_prs`, which skips the pull requests this reports: a plan
+    # waiting on approval is an action only a human can take, and until it is
+    # taken nothing in that change is deployed.
+    terraform.awaiting_approval,
     renovate.stalled_prs,
     renovate.default_config_only,
     # Estate before hygiene: a repository outside the catalogue has nothing

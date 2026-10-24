@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from ..models import Finding, RepoSnapshot
+from .terraform import APPROVAL_PENDING_LABEL
 
 # A Renovate PR open longer than this is not "waiting to be reviewed", it is
 # forgotten. Three weeks spans a holiday without crying wolf, and is short
@@ -108,12 +109,15 @@ def stalled_prs(snapshot: RepoSnapshot) -> list[Finding]:
     "this repository's updates have stopped moving", and eleven findings saying
     so is eleven lines of the same sentence.
     """
-    # Onboarding has its own finding above, and counting it here would report
-    # the same PR twice under two names.
+    # Onboarding has its own finding above, and a plan awaiting approval is
+    # `terraform.awaiting_approval`'s; counting either here would report the
+    # same PR twice under two names.
     prs = [
         pr
         for pr in snapshot.renovate_prs
-        if not pr.draft and "configure renovate" not in pr.title.lower()
+        if not pr.draft
+        and "configure renovate" not in pr.title.lower()
+        and APPROVAL_PENDING_LABEL not in pr.labels
     ]
     if not prs:
         return []

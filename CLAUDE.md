@@ -321,6 +321,23 @@ not answer) stays silent. The page holds 50 refs, because GraphQL scores
 *potential* nodes across the ten-repository batch. `branch_total` lets the check
 say "at least" when the page does not hold every branch.
 
+## Terraform plans awaiting approval
+
+`terraform.awaiting_approval` lists open pull requests carrying
+`terraform-approval-required`. The shared `terraform-deploy.yml` (in
+jay-withers/workflows) fails a PR plan that changes anything until the PR has
+`terraform-approved`, and keeps the pending label on it meanwhile, because
+`cd-terraform` applies on merge and Renovate auto-merges anything green. The
+digest is how those approvals surface: a red required check on a bot's pull
+request announces itself nowhere else.
+
+- **The label name is a contract** with the workflow's `pending-label` input;
+  `APPROVAL_PENDING_LABEL` must match it.
+- `renovate.stalled_prs` skips pull requests carrying it, so a Renovate PR
+  waiting on approval is reported once, under the name that says what to do.
+- Labels come from the detail query (`labels(first: 10)` per open PR), so they
+  share the open-PR page's limit: beyond 30 open PRs the title says "at least".
+
 ## Onboarded is not activated
 
 `renovate.never_opened_a_pr` exists because the other four Renovate checks all
