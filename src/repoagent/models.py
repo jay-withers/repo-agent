@@ -26,6 +26,8 @@ class PullRequest:
     # Last activity of any kind — a push, a comment, a review. What "abandoned"
     # is measured by; `created_at` is the fallback where it is missing.
     updated_at: datetime | None = None
+    # Label names, one page of them. `terraform.awaiting_approval` reads these.
+    labels: tuple[str, ...] = ()
 
     @property
     def is_renovate(self) -> bool:

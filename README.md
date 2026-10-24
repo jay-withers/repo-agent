@@ -57,6 +57,7 @@ catch elsewhere.
 |---|---|---|
 | `renovate.missing_config` | high | No config at any path Renovate reads |
 | `renovate.onboarding_unmerged` | high | Onboarding PR never merged, so Renovate opens nothing |
+| `terraform.awaiting_approval` | medium | Open PRs whose Terraform plan waits on the `terraform-approved` label (they carry `terraform-approval-required`) |
 | `renovate.stalled_prs` | medium/high | Updates not being merged, or a backlog nearing `prConcurrentLimit` |
 | `renovate.never_opened_a_pr` | high | Onboarded but never activated: no update has ever landed |
 | `renovate.default_config_only` | low | Generated config nobody ever added a policy to |

@@ -117,6 +117,10 @@ _REPO_FRAGMENT = """
         createdAt
         updatedAt
         author { login }
+        # For `terraform.awaiting_approval`. Ten is plenty for a label set this
+        # small, and keeps the potential node count (30 PRs x 10 labels across
+        # a ten-repository batch) well inside the limit.
+        labels(first: 10) { nodes { name } }
       }
     }
     # Whether Renovate has ever opened a pull request here at all, which is a
