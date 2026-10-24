@@ -623,12 +623,23 @@ check that never reports leaves a PR pending for ever rather than failing it.
   here and does not invalidate `--locked`. The caller grants
   `pull-requests: write` for the comment — a called workflow can never hold
   more than its caller.
-- `ci-terraform` is half shared, the same split market-agent and
-  azure-container-apps use: `validate` comes from the shared workflow and
-  reports `terraform / Terraform`, while `plan` stays here behind the
-  always-reporting `terraform-plan` gate. `plan` is gated on
-  `vars.AZURE_CLIENT_ID != ''`, which comes from the OIDC identity
-  `github-repos` creates for this repo.
+- `ci-terraform` calls two shared workflows, the same split
+  azure-container-apps uses: `validate` comes from `terraform.yml` and reports
+  `terraform / Terraform`, and `plan` calls `terraform-deploy.yml` for dev,
+  which comments the plan on the PR, behind the always-reporting
+  `terraform-plan` gate. `terraform-deploy.yml` runs its job in the `dev`
+  GitHub environment, where `github-repos` sets `AZURE_CLIENT_ID`,
+  `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID` and federates this repo's OIDC
+  identity to `<repo prefix>:environment:dev`. Callers pass no credentials and
+  can't gate on those variables, since a calling job outside the environment
+  can't read them.
+- **`cd-terraform` applies dev on merge to main** through the same
+  `terraform-deploy.yml`: plan, then apply that exact plan, skipped when
+  nothing changed. Don't run `make apply` for dev after a merge; watch the run
+  instead, and use `workflow_dispatch` to re-run it. The one exception: the
+  identity is Contributor on `rg-repoagent-dev`, which cannot write role
+  assignments, so a change that adds or replaces one fails there and needs a
+  local `make apply ENV=dev`.
 - **`cd-tag` mints a version on every merge, but `cd-publish` only rebuilds when
   `apps` content changed**, diffed against the previous release tag found with
   `git describe --tags --abbrev=0 HEAD^` rather than the push's own range — so
