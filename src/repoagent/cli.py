@@ -1,4 +1,4 @@
-"""One entrypoint — `repoagent scan|render|state|suppress|unsuppress`.
+"""One entrypoint — `repoagent scan|render|state|suppress|unsuppress|selfcheck`.
 
 `scan` and `render` are the workload; the other three are operator commands for
 the state document, and exist because a suppression nobody can add, list or
@@ -84,6 +84,10 @@ def main(argv: list[str] | None = None) -> int:
     speak = sub.add_parser("unsuppress", help="start reporting a finding again")
     speak.add_argument("finding_id", help="the id shown by `repoagent state`")
 
+    sub.add_parser(
+        "selfcheck", help="check settings, secrets and storage as a job would, doing nothing"
+    )
+
     args = parser.parse_args(argv)
 
     _configure_logging()
@@ -98,6 +102,10 @@ def main(argv: list[str] | None = None) -> int:
         # command that needed it.
         if args.command in {"state", "suppress", "unsuppress"}:
             return _state_command(args)
+        if args.command == "selfcheck":
+            from . import selfcheck
+
+            return selfcheck.run()
 
         from .jobs import scan
 
