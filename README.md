@@ -253,6 +253,14 @@ apply that recreated a workload — run `cd-publish` from the Actions tab with
 that tag. Running `make deploy` by hand is for anything else, such as a
 rollback.
 
+**Every deploy is checked, and a failed one rolls back.** Before deploying,
+the workflow records `make deployed-tag` (the tag on the job now). After it,
+`make smoke` (`scripts/smoke.sh`) checks that the scan job is configured with the new
+tag. A job is never started for this, since a run has side effects, so a
+broken image still surfaces at its next scheduled run. If the deploy or the
+check fails, the workflow redeploys the recorded tag and fails the run, so a
+`deploy-failed` issue says whether the job is back on the old version.
+
 ```bash
 make build IMAGE_TAG=v0.0.1
 make push  IMAGE_TAG=v0.0.1
