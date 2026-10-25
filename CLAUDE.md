@@ -373,7 +373,9 @@ Four repositories were in that state at once — `gym-log`, `finances`,
 rather than **activated** in Mend's portal, each with a full Dependency
 Dashboard and seven updates parked under *Awaiting Schedule*. Renovate had run
 and detected everything; it had simply never had a job land inside the preset's
-`before 6am on monday` window. `updateNotScheduled: true` means it rebases
+`before 6am on monday` window. (That window is now all of Monday, for exactly
+this reason: security-testing went months without one Renovate PR.)
+`updateNotScheduled: true` means it rebases
 existing branches at any hour, so only *creation* is confined to those six
 hours a week — which is why market-agent's PRs were created at 00:55 and 05:34
 but rebased at 16:06 and 19:01.
@@ -400,7 +402,8 @@ mention it.
 ## The scan runs on Sunday, and that is load-bearing
 
 The estate's shared preset (`github>jay-withers/renovate`) opens pull requests
-`before 6am on monday` and throttles them with `prHourlyLimit: 4`. The scan's
+`on monday` (it was `before 6am on monday` until October 2026) and throttles
+them with `prHourlyLimit: 4`. The scan's
 cron used to be `0 7 * * 1`, which meant **the agent observed every repository
 at its weekly peak open-PR count**, one hour after a week of updates landed in
 one burst.

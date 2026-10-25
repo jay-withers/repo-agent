@@ -37,8 +37,8 @@ PR_BACKLOG_COUNT = 5
 # A backlog only means anything once the PRs in it have had time to merge.
 #
 # This is **coupled to the scan's cron**. The shared preset opens every
-# repository's PRs `before 6am on monday`, and the scan runs Sunday evening —
-# the point of maximum drain, six days later. Two days is therefore generous:
+# repository's PRs `on monday`, and the scan runs Sunday evening — the point of
+# maximum drain, six days after the window opens. Two days is therefore generous:
 # the batch this check is looking for is a week old by the time it is counted,
 # and the guard exists only to discount a manually triggered Renovate run that
 # happened to open a batch just before the scan.
