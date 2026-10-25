@@ -11,14 +11,22 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from ..models import Finding, RepoSnapshot
-from .terraform import APPROVAL_PENDING_LABEL
+from ..models import Finding, PullRequest, RepoSnapshot
 
 # A Renovate PR open longer than this is not "waiting to be reviewed", it is
 # forgotten. Three weeks spans a holiday without crying wolf, and is short
 # enough that the dependency has not usually been superseded by the time it is
 # reported.
 STALE_PR_DAYS = 21
+
+# How long a Renovate PR may sit BLOCKED or DIRTY before `blocked_prs` names it.
+# Longer than a check run, so a freshly rebased PR whose checks are still going
+# never counts; short enough that one Monday batch that broke is caught the
+# following Sunday.
+BLOCKED_PR_DAYS = 7
+
+# How many PRs a finding names before it stops listing.
+MAX_NAMED = 10
 
 # Enough open Renovate PRs to mean the process has stopped rather than slipped.
 # The number to measure this against is the estate's own `prConcurrentLimit`,
@@ -109,15 +117,13 @@ def stalled_prs(snapshot: RepoSnapshot) -> list[Finding]:
     "this repository's updates have stopped moving", and eleven findings saying
     so is eleven lines of the same sentence.
     """
-    # Onboarding has its own finding above, and a plan awaiting approval is
-    # `terraform.awaiting_approval`'s; counting either here would report the
-    # same PR twice under two names.
+    # Onboarding has its own finding above, and a PR that cannot merge is
+    # `blocked_prs`'s; counting either here would report the same PR twice
+    # under two names.
     prs = [
         pr
         for pr in snapshot.renovate_prs
-        if not pr.draft
-        and "configure renovate" not in pr.title.lower()
-        and APPROVAL_PENDING_LABEL not in pr.labels
+        if not pr.draft and "configure renovate" not in pr.title.lower() and not _blocked(pr)
     ]
     if not prs:
         return []
@@ -156,6 +162,60 @@ def stalled_prs(snapshot: RepoSnapshot) -> list[Finding]:
             age_days=oldest,
         )
     ]
+
+
+def blocked_prs(snapshot: RepoSnapshot) -> list[Finding]:
+    """Renovate PRs that have been unable to merge for a week.
+
+    `stalled_prs` reports a backlog, which reads like a schedule problem. This
+    is a different fact and a worse one: GitHub reports the PR as BLOCKED (a
+    required check is failing) or DIRTY (it conflicts), so platform auto-merge
+    will never merge it and Renovate will rebase it every week for ever. The
+    lock-file maintenance PRs sat like this for a month across four
+    repositories, and every transitive dependency they would have updated,
+    CVE fixes included, stayed frozen behind them. Named PR by PR, because the
+    fix is in the PR: read its failing check.
+
+    A week rather than `STALE_PR_DAYS`, because a blocked PR is not waiting
+    for anything; and not less, because a freshly rebased PR reads BLOCKED
+    while its checks are still running.
+    """
+    blocked = []
+    for pr in snapshot.renovate_prs:
+        age = _age_days(pr.created_at)
+        if not pr.draft and _blocked(pr) and age is not None and age >= BLOCKED_PR_DAYS:
+            blocked.append((age, pr))
+    if not blocked:
+        return []
+
+    blocked.sort(key=lambda item: item[0], reverse=True)
+    named = ", ".join(
+        f"#{pr.number} {pr.title!r} ({_why_blocked(pr)}, open {age}d)"
+        for age, pr in blocked[:MAX_NAMED]
+    )
+    return [
+        Finding(
+            repo=snapshot.full_name,
+            check="renovate.blocked_prs",
+            severity="high",
+            title=f"{len(blocked)} Renovate PR(s) cannot merge",
+            detail=(
+                f"{named}. A required check is failing or the branch conflicts, so auto-merge "
+                "will never take it and every update it carries stays unapplied. Open it and fix "
+                "the failing check."
+            ),
+            evidence_url=f"{snapshot.url}/pulls?q=is%3Apr+is%3Aopen+author%3Aapp%2Frenovate",
+            age_days=blocked[0][0],
+        )
+    ]
+
+
+def _blocked(pr: PullRequest) -> bool:
+    return pr.merge_state in {"BLOCKED", "DIRTY"}
+
+
+def _why_blocked(pr: PullRequest) -> str:
+    return "conflicts" if pr.merge_state == "DIRTY" else "checks failing"
 
 
 def never_opened_a_pr(snapshot: RepoSnapshot) -> list[Finding]:

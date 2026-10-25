@@ -17,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from ..models import Finding, RepoSnapshot
-from . import container, estate, hygiene, renovate, security, terraform, workflows
+from . import container, delivery, estate, hygiene, renovate, security, workflows
 
 Check = Callable[[RepoSnapshot], list[Finding]]
 
@@ -25,16 +25,21 @@ Check = Callable[[RepoSnapshot], list[Finding]]
 # a dependency bot that has quietly stopped working is the thing this agent
 # exists to catch, and everything in `hygiene` is cosmetic beside it.
 ALL: tuple[Check, ...] = (
+    # First: a failed deploy means a release is not running, which outranks
+    # anything about how updates arrive.
+    delivery.deploy_failed,
     renovate.missing_config,
     renovate.onboarding_unmerged,
     # Above `stalled_prs`: a repository that has never had an update at all
     # outranks one whose updates have stopped moving.
     renovate.never_opened_a_pr,
-    # Above `stalled_prs`, which skips the pull requests this reports: a plan
-    # waiting on approval is an action only a human can take, and until it is
-    # taken nothing in that change is deployed.
-    terraform.awaiting_approval,
+    # Above `stalled_prs`, which skips the pull requests this reports: a PR
+    # that cannot merge holds back every update it carries, CVE fixes
+    # included, and only a human can unstick it.
+    renovate.blocked_prs,
     renovate.stalled_prs,
+    # Merged but not yet applied: an action waiting on a human, not a defect.
+    delivery.terraform_pending,
     renovate.default_config_only,
     # Estate before hygiene: a repository outside the catalogue has nothing
     # enforcing anything on it, which outranks every cosmetic finding below.

@@ -1,12 +1,13 @@
 """What GitHub's own security tooling has already found and nobody has fixed.
 
-CodeQL runs in CI and its job is green whatever it finds — results land in
-Security → Code scanning, a tab nobody visits unprompted. So an alert can sit
-open for months on a repository whose every check is passing. This is the
-prompt.
+CodeQL runs in CI and its job is green whatever it finds, and the shared
+docker.yml uploads Trivy's container image findings to the same place without
+failing a publish. Both land in Security → Code scanning, a tab nobody visits
+unprompted, so an alert can sit open for months on a repository whose every
+check is passing. This is the prompt.
 
-Only CodeQL, and only open alerts. Dependabot and secret scanning alerts are
-still deliberately unread; see CLAUDE.md.
+Every code scanning tool, open alerts only. Dependabot and secret scanning
+alerts are still deliberately unread; see CLAUDE.md.
 """
 
 from __future__ import annotations
@@ -36,7 +37,7 @@ _PAGE = 100
 
 
 def open_code_scanning_alerts(snapshot: RepoSnapshot) -> list[Finding]:
-    """Open CodeQL alerts, rolled into one finding per repository.
+    """Open code scanning alerts (CodeQL, Trivy), rolled into one finding per repository.
 
     One finding rather than one per alert, because `Finding.id` is `repo:check`
     and the digest is read by a person: forty rows for forty alerts bury every
@@ -70,6 +71,7 @@ def open_code_scanning_alerts(snapshot: RepoSnapshot) -> list[Finding]:
         named += f" and {len(rules) - _RULES_NAMED} more rule(s)"
 
     count = f"at least {len(alerts)}" if len(alerts) >= _PAGE else str(len(alerts))
+    tools = sorted({a.tool or "unknown tool" for a in alerts})
     oldest = min((a.created_at for a in alerts if a.created_at), default=None)
 
     return [
@@ -77,10 +79,10 @@ def open_code_scanning_alerts(snapshot: RepoSnapshot) -> list[Finding]:
             repo=snapshot.full_name,
             check="security.open_code_scanning_alerts",
             severity=severity,
-            title=f"{count} open CodeQL alert(s)",
+            title=f"{count} open {' and '.join(tools)} alert(s)",
             detail=(
-                f"{breakdown}. Rules: {named}. CodeQL reports without failing the build, "
-                "so these sit in the Security tab until someone fixes or dismisses them."
+                f"{breakdown}. Rules: {named}. Code scanning reports without failing the "
+                "build, so these sit in the Security tab until someone fixes or dismisses them."
             ),
             evidence_url=f"{snapshot.url}/security/code-scanning",
             age_days=(datetime.now(UTC) - oldest).days if oldest else None,

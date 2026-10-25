@@ -41,6 +41,26 @@ def test_open_alerts_are_one_finding_per_repository() -> None:
     assert finding.age_days == 40
 
 
+def test_trivy_and_codeql_alerts_are_one_finding_naming_both_tools() -> None:
+    alerts = (
+        code_alert("CVE-2026-1234", "critical", number=1, tool="Trivy"),
+        code_alert("py/path-injection", "medium", number=2),
+    )
+
+    [finding] = security.open_code_scanning_alerts(snapshot(code_scanning_alerts=alerts))
+
+    assert finding.title == "2 open CodeQL and Trivy alert(s)"
+    assert finding.severity == "high"
+    assert "`CVE-2026-1234`" in finding.detail
+
+
+def test_parse_reads_the_tool_name() -> None:
+    [alert] = parse.code_scanning_alerts(
+        [{"number": 1, "rule": {"id": "CVE-1"}, "tool": {"name": "Trivy"}}]
+    )
+    assert alert.tool == "Trivy"
+
+
 def test_severity_follows_the_worst_alert() -> None:
     def severity_of(*levels: str) -> str:
         alerts = tuple(code_alert(severity=s, number=i) for i, s in enumerate(levels))
@@ -146,7 +166,8 @@ def test_alerts_are_read_per_repository_and_a_404_is_unknown() -> None:
     assert alerts["o/b"] is None
     [first, *_] = [c for c in calls if "code-scanning" in str(c.url)]
     assert first.url.params["state"] == "open"
-    assert first.url.params["tool_name"] == "CodeQL"
+    # Every tool: Trivy's image findings land beside CodeQL's.
+    assert "tool_name" not in first.url.params
 
 
 def test_the_scan_reports_open_alerts() -> None:

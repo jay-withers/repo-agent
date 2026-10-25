@@ -173,6 +173,16 @@ def _snapshots(
         for repo in repos
     ]
 
+    # The same independence for issues, which `checks.delivery` reads.
+    try:
+        raw_issues = github_client.open_issues(wanted, client=session)
+    except Exception as exc:
+        logger.warning("issues unavailable, continuing without them: %s", exc)
+        raw_issues = {}
+    repos = [
+        replace(repo, open_issues=parse.issues(raw_issues.get(repo.full_name))) for repo in repos
+    ]
+
     # Deliberately broad. Anything this query can raise — a transport error, a
     # GraphQL node-limit rejection, a shape nobody anticipated — should cost the
     # run its detail and not its digest. The REST list alone still reports every

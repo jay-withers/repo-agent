@@ -117,10 +117,10 @@ _REPO_FRAGMENT = """
         createdAt
         updatedAt
         author { login }
-        # For `terraform.awaiting_approval`. Ten is plenty for a label set this
-        # small, and keeps the potential node count (30 PRs x 10 labels across
-        # a ten-repository batch) well inside the limit.
-        labels(first: 10) { nodes { name } }
+        # For `renovate.blocked_prs`: BLOCKED is a required check failing (or
+        # still running), DIRTY is a conflict. Needs only Pull requests: read,
+        # unlike statusCheckRollup, which wants the Checks permission too.
+        mergeStateStatus
       }
     }
     # Whether Renovate has ever opened a pull request here at all, which is a
@@ -246,7 +246,11 @@ def code_scanning_alerts(
     full_names: list[str],
     client: httpx.Client | None = None,
 ) -> dict[str, list[dict[str, Any]] | None]:
-    """Open CodeQL alerts for each repository, keyed by `owner/name`.
+    """Open code scanning alerts for each repository, keyed by `owner/name`.
+
+    Every tool, not just CodeQL: the shared docker.yml uploads Trivy's image
+    findings to the same place, and an alert from either is a fixable defect
+    nobody has fixed.
 
     REST, one request per repository, because GraphQL does not expose code
     scanning at all. Sequential like everything else here.
@@ -274,22 +278,57 @@ def code_scanning_alerts(
             page = get_json(
                 f"{settings().github_api_url}/repos/{full_name}/code-scanning/alerts",
                 headers=auth.auth_headers(client=client),
-                params={
-                    "state": "open",
-                    "tool_name": "CodeQL",
-                    "per_page": PAGE_SIZE,
-                },
+                params={"state": "open", "per_page": PAGE_SIZE},
                 client=client,
             )
         except Exception as exc:
             # Logged at info, not warning: a 404 from a repository that has never
-            # run CodeQL is the normal case for most of an estate.
+            # run a scanner is the normal case for much of an estate.
             logger.info("no code scanning alerts for %s: %s", full_name, exc)
             alerts[full_name] = None
             continue
         alerts[full_name] = page if isinstance(page, list) else None
 
     return alerts
+
+
+# The App permission GitHub calls "Issues".
+ISSUES_PERMISSION = "issues"
+
+
+def open_issues(
+    full_names: list[str],
+    client: httpx.Client | None = None,
+) -> dict[str, list[dict[str, Any]] | None]:
+    """Open issues for each repository, keyed by `owner/name`.
+
+    For `checks.delivery`: the shared workflows open `terraform-pending` and
+    `deploy-failed` issues, and the digest is where they are listed weekly.
+    REST, one page of 100 per repository, the same shape and the same
+    permission gate as `code_scanning_alerts`: without the permission nothing
+    is requested and the mapping is empty, so the checks stay silent. The
+    endpoint also returns pull requests; `parse.issues` drops them.
+    """
+    if not auth.permitted(ISSUES_PERMISSION, client=client):
+        logger.info("App lacks the %s permission; not reading issues", ISSUES_PERMISSION)
+        return {}
+
+    issues: dict[str, list[dict[str, Any]] | None] = {}
+    for full_name in full_names:
+        try:
+            page = get_json(
+                f"{settings().github_api_url}/repos/{full_name}/issues",
+                headers=auth.auth_headers(client=client),
+                params={"state": "open", "per_page": PAGE_SIZE},
+                client=client,
+            )
+        except Exception as exc:
+            logger.info("issues unavailable for %s: %s", full_name, exc)
+            issues[full_name] = None
+            continue
+        issues[full_name] = page if isinstance(page, list) else None
+
+    return issues
 
 
 # Where the estate's catalogue of every repository lives. Read through the same

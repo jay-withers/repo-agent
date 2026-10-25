@@ -10,7 +10,7 @@ from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
-from ..models import Branch, CodeScanningAlert, PullRequest, RepoSnapshot, Workflow
+from ..models import Branch, CodeScanningAlert, Issue, PullRequest, RepoSnapshot, Workflow
 
 
 def repo_snapshot(raw: dict[str, Any]) -> RepoSnapshot:
@@ -57,11 +57,7 @@ def pull_request(raw: dict[str, Any]) -> PullRequest:
         url=raw.get("url", ""),
         draft=bool(raw.get("isDraft", False)),
         updated_at=_timestamp(raw.get("updatedAt")),
-        labels=tuple(
-            node["name"]
-            for node in ((raw.get("labels") or {}).get("nodes") or [])
-            if node and node.get("name")
-        ),
+        merge_state=raw.get("mergeStateStatus") or "",
     )
 
 
@@ -85,9 +81,35 @@ def code_scanning_alerts(raw: list[dict[str, Any]] | None) -> tuple[CodeScanning
                 ).lower(),
                 created_at=_timestamp(entry.get("created_at")),
                 url=entry.get("html_url", ""),
+                tool=(entry.get("tool") or {}).get("name") or "",
             )
         )
     return tuple(alerts)
+
+
+def issues(raw: list[dict[str, Any]] | None) -> tuple[Issue, ...] | None:
+    """Build issues from one `/issues` page, keeping None as None.
+
+    The endpoint lists pull requests too, marked by a `pull_request` key; those
+    belong to the detail query and are dropped here.
+    """
+    if raw is None:
+        return None
+    return tuple(
+        Issue(
+            number=int(entry.get("number", 0)),
+            title=entry.get("title", ""),
+            labels=tuple(
+                label["name"]
+                for label in entry.get("labels") or []
+                if isinstance(label, dict) and label.get("name")
+            ),
+            created_at=_timestamp(entry.get("created_at")),
+            url=entry.get("html_url", ""),
+        )
+        for entry in raw
+        if isinstance(entry, dict) and "pull_request" not in entry
+    )
 
 
 def merge_detail(snapshot: RepoSnapshot, detail: dict[str, Any] | None) -> RepoSnapshot:
