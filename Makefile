@@ -76,9 +76,9 @@ deployed-tag: ## Print the image tag live on the job
 		| sed -n 's|^$(IMAGE_REGISTRY)/repoagent:||p'
 
 # Run by cd-publish after every deploy (and by hand after a local one). A
-# failure there rolls back to `make deployed-tag`'s answer. Jobs are only
-# checked for the image, never started: a run has side effects.
-smoke: ## Check IMAGE_TAG is set on the scan job (IMAGE_TAG required)
+# failure there rolls back to `make deployed-tag`'s answer. Each job also gets
+# one `selfcheck` run, which does nothing a real run would (no scan, no email).
+smoke: ## Check IMAGE_TAG is set on the scan job, and selfcheck it (IMAGE_TAG required)
 	@if [ -z "$(IMAGE_TAG_EXPLICIT)" ]; then \
 		echo "error: pass the tag to check, e.g. make smoke IMAGE_TAG=v0.1.0" >&2; exit 1; fi
 	@terraform -chdir=$(TF_DIR) init -reconfigure -backend-config=backends/$(ENV).hcl >/dev/null
