@@ -672,10 +672,11 @@ Renovate auto-merge a Python 3.15 base image that could not build.
   identity to `<repo prefix>:environment:dev`. Callers pass no credentials and
   can't gate on those variables, since a calling job outside the environment
   can't read them.
-- **`cd-terraform` applies dev on merge to main** through the same
-  `terraform-deploy.yml`: plan, then apply that exact plan, skipped when
-  nothing changed. Don't run `make apply` for dev after a merge; watch the run
-  instead, and use `workflow_dispatch` to re-run it. The one exception: the
+- **`cd-terraform` plans dev on merge to main and applies only when run by
+  hand** (`workflow_dispatch`), through the same `terraform-deploy.yml`. A
+  merge whose plan has changes opens a `terraform-pending` issue, which this
+  agent's own `delivery.terraform_pending` check lists; the manual run applies
+  exactly the plan it prints and closes it. The one exception: the
   identity is Contributor on `rg-repoagent-dev`, which cannot write role
   assignments, so a change that adds or replaces one fails there and needs a
   local `make apply ENV=dev`.
