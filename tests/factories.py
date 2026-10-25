@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from repoagent.models import Branch, CodeScanningAlert, PullRequest, RepoSnapshot, Workflow
+from repoagent.models import Branch, CodeScanningAlert, Issue, PullRequest, RepoSnapshot, Workflow
 
 HEALTHY_RENOVATE = '{"extends": ["github>jay-withers/renovate"], "packageRules": []}'
 
@@ -127,13 +127,34 @@ def branch(name: str = "feature", days_old: int = 1, has_open_pr: bool = False) 
 
 
 def code_alert(
-    rule: str = "py/path-injection", severity: str = "high", days_old: int = 10, number: int = 1
+    rule: str = "py/path-injection",
+    severity: str = "high",
+    days_old: int = 10,
+    number: int = 1,
+    tool: str = "CodeQL",
 ) -> CodeScanningAlert:
-    """An open CodeQL alert raised `days_old` days ago."""
+    """An open code scanning alert raised `days_old` days ago, CodeQL by default."""
     return CodeScanningAlert(
         number=number,
         rule=rule,
         severity=severity,
         created_at=datetime.now(UTC) - timedelta(days=days_old),
         url=f"https://github.com/jay-withers/widget/security/code-scanning/{number}",
+        tool=tool,
+    )
+
+
+def issue(
+    number: int = 5,
+    title: str = "Deploy to dev failed",
+    labels: tuple[str, ...] = (),
+    days_old: int = 3,
+) -> Issue:
+    """An open issue opened `days_old` days ago."""
+    return Issue(
+        number=number,
+        title=title,
+        labels=labels,
+        created_at=datetime.now(UTC) - timedelta(days=days_old),
+        url=f"https://github.com/jay-withers/widget/issues/{number}",
     )

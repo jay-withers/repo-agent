@@ -26,8 +26,10 @@ class PullRequest:
     # Last activity of any kind — a push, a comment, a review. What "abandoned"
     # is measured by; `created_at` is the fallback where it is missing.
     updated_at: datetime | None = None
-    # Label names, one page of them. `terraform.awaiting_approval` reads these.
-    labels: tuple[str, ...] = ()
+    # GraphQL's mergeStateStatus: BLOCKED (a required check failing or still
+    # running), DIRTY (conflicts), BEHIND, CLEAN... Empty where unknown.
+    # `renovate.blocked_prs` reads it.
+    merge_state: str = ""
 
     @property
     def is_renovate(self) -> bool:
@@ -66,7 +68,7 @@ class Workflow:
 
 @dataclass(frozen=True)
 class CodeScanningAlert:
-    """One open CodeQL alert, as much of it as `security.open_code_scanning_alerts` needs.
+    """One open code scanning alert, as much of it as `security.open_code_scanning_alerts` needs.
 
     `severity` is the rule's security severity (`critical`/`high`/`medium`/`low`)
     where it has one, and its plain severity (`error`/`warning`/`note`) where it
@@ -76,6 +78,19 @@ class CodeScanningAlert:
     number: int
     rule: str
     severity: str
+    created_at: datetime | None = None
+    url: str = ""
+    # The tool that raised it: CodeQL for code, Trivy for container images.
+    tool: str = ""
+
+
+@dataclass(frozen=True)
+class Issue:
+    """One open issue, as much of it as `checks.delivery` needs."""
+
+    number: int
+    title: str
+    labels: tuple[str, ...] = ()
     created_at: datetime | None = None
     url: str = ""
 
@@ -153,6 +168,11 @@ class RepoSnapshot:
     # code scanning has never run here, or the request failed — which must
     # never read as "no open alerts".
     code_scanning_alerts: tuple[CodeScanningAlert, ...] | None = None
+    # Open issues, one page of them, pull requests excluded. Fetched over REST
+    # like the alerts, and only when the App holds the Issues permission. None
+    # when they could not be read, which must never read as "no failed
+    # deploys" or "nothing pending".
+    open_issues: tuple[Issue, ...] | None = None
 
     @property
     def renovate_prs(self) -> tuple[PullRequest, ...]:

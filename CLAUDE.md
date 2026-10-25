@@ -172,15 +172,18 @@ change to either repository.
 exemption nobody can see is one nobody revisits, and a topic added by mistake
 would otherwise silently drop a repository out of the digest for ever.
 
-## Security scanning: CodeQL read, the rest not
+## Security scanning: code scanning read, the rest not
 
-**`security.open_code_scanning_alerts` reads open CodeQL alerts.** The CodeQL
-workflow is green whatever it finds and results land in a Security tab nobody
+**`security.open_code_scanning_alerts` reads open code scanning alerts from
+every tool**: CodeQL, and Trivy's container image findings, which the shared
+docker.yml uploads without failing a publish. The CodeQL workflow is green
+whatever it finds and results land in a Security tab nobody
 visits, so an alert can sit open for months behind a wall of passing checks.
 That is exactly the "configured but not working" gap this agent exists for.
 
 - **REST, per repository**, because GraphQL does not expose code scanning. One
-  page of 100, `state=open&tool_name=CodeQL`; a full page says "at least".
+  page of 100, `state=open`, every tool; a full page says "at least". The
+  title names the tools (`CodeQL and Trivy`).
 - **Needs the App's `Code scanning alerts: read` (`security_events`)
   permission**, which means an accepted re-approval on the installation.
   `auth.permitted` reads the token's own `permissions` grant and the fetch is
@@ -321,22 +324,39 @@ not answer) stays silent. The page holds 50 refs, because GraphQL scores
 *potential* nodes across the ten-repository batch. `branch_total` lets the check
 say "at least" when the page does not hold every branch.
 
-## Terraform plans awaiting approval
+## Delivery: what the shared workflows are waiting on
 
-`terraform.awaiting_approval` lists open pull requests carrying
-`terraform-approval-required`. The shared `terraform-deploy.yml` (in
-jay-withers/workflows) fails a PR plan that changes anything until the PR has
-`terraform-approved`, and keeps the pending label on it meanwhile, because
-`cd-terraform` applies on merge and Renovate auto-merges anything green. The
-digest is how those approvals surface: a red required check on a bot's pull
-request announces itself nowhere else.
+`checks.delivery` reads open issues that jay-withers/workflows opens:
+`deploy-failed` (a deploy or apply on main failed; the next success closes it)
+and `terraform-pending` (cd-terraform planned changes on main that nobody has
+applied; applying is a manual run, which closes it). Creating either emails the
+owner once, and the digest is the weekly reminder of whatever is still open.
 
-- **The label name is a contract** with the workflow's `pending-label` input;
-  `APPROVAL_PENDING_LABEL` must match it.
-- `renovate.stalled_prs` skips pull requests carrying it, so a Renovate PR
-  waiting on approval is reported once, under the name that says what to do.
-- Labels come from the detail query (`labels(first: 10)` per open PR), so they
-  share the open-PR page's limit: beyond 30 open PRs the title says "at least".
+- **The label names are a contract** with the workflows; the constants in
+  `checks/delivery.py` must match them.
+- **Issues come over REST** (`client.open_issues`, one page of 100 per repo),
+  gated on the App's **Issues** permission exactly as code scanning is gated
+  on `security_events`: without it nothing is requested and the checks stay
+  silent. `/issues` lists pull requests too; `parse.issues` drops them.
+- `open_issues` is a tri-state like `code_scanning_alerts`: `None` (no
+  permission, or the request failed) must never read as "no failed deploys".
+
+## Renovate PRs that cannot merge
+
+`renovate.blocked_prs` names Renovate PRs whose `mergeStateStatus` has been
+BLOCKED (a required check failing) or DIRTY (conflicts) for a week. It exists
+because `stalled_prs` reports a *backlog*, which reads like a schedule problem,
+while a blocked PR is broken: auto-merge will never take it, and Renovate
+rebases it every week for ever. The lock-file maintenance PRs sat exactly like
+this for a month in four repositories, failing pre-commit on a terraform-docs
+rewrite, and every transitive dependency they carried, CVE fixes included,
+stayed frozen. The digest said "not being merged" each week and never said why.
+
+- `mergeStateStatus` needs only Pull requests: read. `statusCheckRollup` would
+  say more but wants the Checks permission too, and a permission failure in
+  GraphQL fails the whole detail batch.
+- A week, because a freshly rebased PR reads BLOCKED while its checks run.
+- `stalled_prs` skips blocked PRs, so each PR is reported once.
 
 ## Onboarded is not activated
 
@@ -524,7 +544,7 @@ interpolated: `") { evil }` is a legal GitHub repository name.
 
 **`branchProtectionRules` and `vulnerabilityAlerts` are deliberately absent**
 from that query. Both need permissions beyond the App's read-only
-metadata/contents/pull-requests/code-scanning set, and GraphQL reports a permission failure
+metadata/contents/pull-requests/code-scanning/issues set, and GraphQL reports a permission failure
 as an `errors` entry — which `fetch.graphql` turns into a `FetchError` that
 fails the whole batch, not just the field. Adding either means widening the App
 first.

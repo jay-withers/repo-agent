@@ -57,7 +57,9 @@ catch elsewhere.
 |---|---|---|
 | `renovate.missing_config` | high | No config at any path Renovate reads |
 | `renovate.onboarding_unmerged` | high | Onboarding PR never merged, so Renovate opens nothing |
-| `terraform.awaiting_approval` | medium | Open PRs whose Terraform plan waits on the `terraform-approved` label (they carry `terraform-approval-required`) |
+| `delivery.deploy_failed` | high | Open `deploy-failed` issues: a deploy or apply on main failed and hasn't succeeded since (needs the Issues permission) |
+| `renovate.blocked_prs` | high | Renovate PRs BLOCKED (a required check failing) or DIRTY (conflicts) for 7+ days, named: auto-merge will never take them |
+| `delivery.terraform_pending` | medium | Open `terraform-pending` issues: Terraform changes on main waiting for a manual `cd-terraform` run (needs the Issues permission) |
 | `renovate.stalled_prs` | medium/high | Updates not being merged, or a backlog nearing `prConcurrentLimit` |
 | `renovate.never_opened_a_pr` | high | Onboarded but never activated: no update has ever landed |
 | `renovate.default_config_only` | low | Generated config nobody ever added a policy to |
@@ -73,7 +75,7 @@ catch elsewhere.
 | `estate.unenforced_check` | medium | A workflow gates every PR, but the catalogue does not require its context |
 | `estate.incomplete_terraform_lock` | high | Providers locked for fewer platforms than run Terraform |
 | `estate.not_shared_preset` | low | Renovate config does not extend the estate's shared preset |
-| `security.open_code_scanning_alerts` | high/medium/low | Open CodeQL alerts, graded by the worst; silent where code scanning has never run or the App lacks the permission |
+| `security.open_code_scanning_alerts` | high/medium/low | Open code scanning alerts (CodeQL, and Trivy's image findings), graded by the worst; silent where code scanning has never run or the App lacks the permission |
 | `workflows.unpinned_actions` | high | Third-party action referenced by a mutable tag |
 | `workflows.unpinned_first_party_actions` | low | GitHub-owned action on a tag |
 | `workflows.retired_runners` | medium | Runner image GitHub has withdrawn or will |
@@ -211,7 +213,7 @@ needs no diary entry to rotate.
 Create it under your account with these **read-only** permissions — Metadata,
 Contents, Issues, Pull requests, Checks, Actions, Administration, Code scanning
 alerts — and install it on **all repositories**, so a new repo is covered without
-a config change. Code scanning alerts is optional: without it the CodeQL check is
+a config change. Code scanning alerts and Issues are optional: without them the code scanning and delivery checks are
 silent and nothing else changes.
 
 Then record the App ID and download the private key. The installation ID is
@@ -287,7 +289,7 @@ pulls it:
 1. Apply `azure-container-apps` (dev).
 2. Create the GitHub App **and install it** — two separate actions, and the
    second is easy to miss. Needs `Metadata`, `Contents` and `Pull requests`,
-   all read-only, plus read-only `Code scanning alerts` for the CodeQL check, and **All repositories** so a new repo is covered with no
+   all read-only, plus read-only `Code scanning alerts` for the code scanning check and read-only `Issues` for the delivery checks, and **All repositories** so a new repo is covered with no
    config change. Changing permissions on an existing installation raises a
    request that has to be accepted before it takes effect.
 3. Merge to `main` here — `cd-tag` mints a version, `cd-publish` pushes the image.
