@@ -103,9 +103,8 @@ def run(*, send_email: bool = True, http: httpx.Client | None = None) -> ScanRes
             text=digest.render_text(result),
             client=session,
         )
-        # Logged rather than raised, and the status is part of the log line:
-        # `skipped` is the normal outcome of a development run and must not
-        # read as a failure.
+        # The status is part of the log line: `skipped` is the normal outcome
+        # of a development run and must not read as a failure.
         logger.info(
             "scanned %d repositories, %d finding(s), email %s",
             len(repos),
@@ -113,9 +112,16 @@ def run(*, send_email: bool = True, http: httpx.Client | None = None) -> ScanRes
             outcome.status,
         )
 
+        # A digest nobody received is a failed run. Logging it and exiting 0
+        # left the execution green and the job-failure alert silent, so the
+        # only sign was an empty inbox on Monday. Raised before the save, so
+        # the retry still reports this week's findings as new.
+        if outcome.status == "failed":
+            raise RuntimeError(f"digest email was not sent: {outcome.error}")
+
         # Last, and only once the digest is out. A run that failed to send must
         # not record its findings as seen, or the retry reports nothing as new.
-        if outcome.status != "skipped":
+        if outcome.status == "sent":
             state.save(reconciled.state)
         return result
     finally:

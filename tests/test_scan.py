@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import httpx
+import pytest
 
 from repoagent import digest
 from repoagent.jobs import scan
@@ -300,3 +301,29 @@ def test_suggestions_are_not_written_to_state(monkeypatch) -> None:
     # Every id the state document carries traces to a check, never to the model.
     stored = saved[0]
     assert all(known.check for known in stored.findings.values())
+
+
+def test_a_failed_email_fails_the_run_and_does_not_save_state(monkeypatch) -> None:
+    """A digest nobody received must not leave the job execution green."""
+    monkeypatch.setenv("DIGEST_EMAIL_TO", "someone@example.com")
+    from repoagent import fetch, state
+    from repoagent import settings as settings_module
+
+    settings_module.optional_secret.cache_clear()
+    monkeypatch.setattr(fetch.time, "sleep", lambda _: None)
+    saved: list[object] = []
+    monkeypatch.setattr(state, "save", lambda s: saved.append(s) or True)
+
+    with pytest.raises(RuntimeError, match="digest email was not sent"):
+        scan.run(
+            send_email=True,
+            http=route_client(
+                {
+                    **_AUTH_ROUTES,
+                    "/installation/repositories": httpx.Response(200, json=_REPOS),
+                    "api.resend.com": httpx.Response(422, json={"message": "invalid"}),
+                }
+            ),
+        )
+
+    assert saved == []

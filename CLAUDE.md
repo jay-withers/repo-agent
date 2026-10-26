@@ -37,6 +37,11 @@ it is resolved no check produces it, so nothing else describes it.
   failed to send must not record its findings as seen, or the retry reports
   nothing as new. `render` never saves at all — otherwise `make run` twice would
   empty Monday's "new" section.
+- **A `failed` send fails the job** (exit 1), so the platform's job-failure
+  alert fires. It used to be logged at WARNING with the execution left green,
+  which made "the job ran fine but no email arrived" undiagnosable from the
+  portal. `skipped` (no `DIGEST-EMAIL-TO`) still succeeds: that is a
+  deliberate off switch, not a failure.
 - Absent state degrades to "everything is new" and never fails the run, the same
   contract as triage.
 

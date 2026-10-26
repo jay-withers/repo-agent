@@ -3,9 +3,9 @@
 Copied from jay-withers/market-agent apps/marketagent/src/marketagent/mailer.py
 with the secret name and sender changed. Re-copy rather than diverge.
 
-Deliberately thin, and it returns its outcome rather than raising: sending is
-the last thing a run does, and a mail provider having a bad minute should not
-turn a successful scan into a failed job.
+Deliberately thin, and it returns its outcome rather than raising, so the
+caller decides what an unsent email means. The scan fails the job on `failed`:
+a digest nobody received is the whole run lost, and a green execution hid it.
 """
 
 from __future__ import annotations
