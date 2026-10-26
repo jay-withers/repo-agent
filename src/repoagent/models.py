@@ -143,6 +143,9 @@ class RepoSnapshot:
     # all — in both cases there is nothing to hold its workflows to, and
     # `estate.unmanaged` already reports the second.
     required_checks: tuple[str, ...] | None = None
+    # Whether the catalogue's ruleset blocks merges on new code scanning
+    # alerts. None exactly when `required_checks` is.
+    code_scanning_enforced: bool | None = None
     open_prs: tuple[PullRequest, ...] = ()
     # How many pull requests are open, which can exceed `open_prs`: that is one
     # page, oldest first. None where the detail query did not say.

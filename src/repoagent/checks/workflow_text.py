@@ -12,7 +12,10 @@ from dataclasses import dataclass
 
 _JOB_ID = re.compile(r"^  ([A-Za-z0-9_.-]+):\s*$")
 _JOB_NAME = re.compile(r"^    name:\s*(.+?)\s*$")
-_JOB_USES = re.compile(r"^    uses:\s*\S+")
+_JOB_USES = re.compile(r"^    uses:\s*(\S+)")
+# `needs: a`, `needs: [a, b]`, or `needs:` followed by a block list at six.
+_JOB_NEEDS = re.compile(r"^    needs:\s*(.*?)\s*$")
+_NEEDS_ITEM = re.compile(r"^      - \s*([A-Za-z0-9_.-]+)\s*$")
 _JOB_PERMISSIONS = re.compile(r"^    permissions:")
 # `strategy:` sits at four spaces and `matrix:` under it at six. A matrix job's
 # context carries its leg — `plan (dev)` — which cannot be reconstructed from
@@ -31,13 +34,22 @@ class Job:
 
     id: str
     name: str | None = None
-    # Whether the job calls a reusable workflow, which changes the shape of the
-    # context entirely: one per job in *that* workflow, namespaced `<id> / <job>`.
-    calls: bool = False
+    # The reusable workflow the job calls, if it calls one. That changes the
+    # shape of the context entirely: one per job in *that* workflow, namespaced
+    # `<id> / <job>`.
+    uses: str | None = None
+    # The job ids this job waits on, which is what makes a gate job cover the
+    # jobs behind it.
+    needs: tuple[str, ...] = ()
     matrix: bool = False
     # Whether the job sets its own `permissions:`, which overrides the
     # workflow's for that job's token.
     scoped: bool = False
+
+    @property
+    def calls(self) -> bool:
+        """Whether the job calls a reusable workflow."""
+        return self.uses is not None
 
     @property
     def context(self) -> str:
@@ -51,12 +63,23 @@ def jobs(text: str) -> list[Job]:
     in_jobs = False
     job_id: str | None = None
     name: str | None = None
-    calls = matrix = scoped = False
+    uses: str | None = None
+    needs: list[str] = []
+    in_needs = matrix = scoped = False
 
     def close() -> None:
         """Record the job just finished, now that its keys have been seen."""
         if job_id is not None:
-            found.append(Job(id=job_id, name=name, calls=calls, matrix=matrix, scoped=scoped))
+            found.append(
+                Job(
+                    id=job_id,
+                    name=name,
+                    uses=uses,
+                    needs=tuple(needs),
+                    matrix=matrix,
+                    scoped=scoped,
+                )
+            )
 
     for line in text.splitlines():
         if not in_jobs:
@@ -65,13 +88,22 @@ def jobs(text: str) -> list[Job]:
         match = _JOB_ID.match(line)
         if match:
             close()
-            job_id, name = match.group(1), None
-            calls = matrix = scoped = False
+            job_id, name, uses, needs = match.group(1), None, None, []
+            in_needs = matrix = scoped = False
             continue
         if job_id is None:
             continue
-        if _JOB_USES.match(line):
-            calls = True
+        if in_needs:
+            if item := _NEEDS_ITEM.match(line):
+                needs.append(item.group(1))
+                continue
+            in_needs = False
+        if called := _JOB_USES.match(line):
+            uses = called.group(1)
+        elif needed := _JOB_NEEDS.match(line):
+            inline = needed.group(1).split("#", 1)[0].strip()
+            needs = [n for n in re.split(r"[\s,\[\]]+", inline) if n]
+            in_needs = not inline
         elif _JOB_MATRIX.match(line):
             matrix = True
         elif _JOB_PERMISSIONS.match(line):

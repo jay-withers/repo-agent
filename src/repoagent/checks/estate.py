@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 
 from ..models import Finding, RepoSnapshot
-from .workflow_text import _EVENT, _ON, jobs
+from .workflow_text import _EVENT, _ON, Job, jobs
 
 # Renovate policy is centralised in one preset repository. A config extending it
 # inherits every later change; one that does not has silently opted out.
@@ -221,42 +221,93 @@ def unenforced_check(snapshot: RepoSnapshot) -> list[Finding]:
         return []
 
     unenforced: list[tuple[str, str]] = []
+    unscanned: list[str] = []
     for wf in snapshot.workflows:
         if not _gates_every_pull_request(wf.text):
             continue
-        for job in jobs(wf.text):
-            if job.matrix:
+        found = jobs(wf.text)
+        covered = _covered_by_required(found, required)
+        for job in found:
+            if job.matrix or job.id in covered or _is_required(job, required):
+                continue
+            if job.uses and _CODEQL.search(job.uses):
+                # Enforced through the ruleset's code scanning rule, not a
+                # status check: the estate's way of making CodeQL block a merge.
+                if not snapshot.code_scanning_enforced:
+                    unscanned.append(wf.name)
                 continue
             if job.calls:
-                prefix = f"{job.id} / "
-                if not any(c == job.id or c.startswith(prefix) for c in required):
-                    # The far half is defined in the reusable workflow's own
-                    # repository, so it is left unwritten rather than guessed.
-                    unenforced.append((f"{job.id} / \u2026", wf.name))
-            elif job.context not in required:
+                # The far half is defined in the reusable workflow's own
+                # repository, so it is left unwritten rather than guessed.
+                unenforced.append((f"{job.id} / \u2026", wf.name))
+            else:
                 unenforced.append((job.context, wf.name))
 
-    if not unenforced:
+    if not unenforced and not unscanned:
         return []
 
-    listed = ", ".join(f"`{context}` ({name})" for context, name in unenforced)
+    parts: list[str] = []
+    if unenforced:
+        listed = ", ".join(f"`{context}` ({name})" for context, name in unenforced)
+        parts.append(
+            f"{listed} not in this repository's `required_status_checks` in the "
+            "github-repos catalogue, so a red run does not block a merge — and a "
+            "Renovate pull request, auto-approved and auto-merged, never has a human "
+            "to notice. Each runs on every pull request, so each can be required "
+            "without leaving one pending. Read the exact context off `gh pr checks` "
+            "rather than inferring it."
+        )
+    if unscanned:
+        parts.append(
+            f"CodeQL runs ({', '.join(unscanned)}) but the catalogue entry does not set "
+            "`code_scanning = true`, so a new alert does not block a merge. Set that "
+            "rather than requiring the CodeQL status check."
+        )
+    count = len(unenforced) + len(unscanned)
     return [
         Finding(
             repo=snapshot.full_name,
             check="estate.unenforced_check",
             severity="medium",
-            title=f"{len(unenforced)} pull request check(s) nothing requires",
-            detail=(
-                f"{listed} not in this repository's `required_status_checks` in the "
-                "github-repos catalogue, so a red run does not block a merge — and a "
-                "Renovate pull request, auto-approved and auto-merged, never has a human "
-                "to notice. Each runs on every pull request, so each can be required "
-                "without leaving one pending. Read the exact context off `gh pr checks` "
-                "rather than inferring it."
-            ),
+            title=f"{count} pull request check(s) nothing requires",
+            detail=" ".join(parts),
             evidence_url="https://github.com/jay-withers/github-repos",
         )
     ]
+
+
+# A job calling the shared CodeQL workflow, by path: `owner/repo/...@ref` from
+# another repository, or `./.github/workflows/codeql.yml` from inside workflows.
+_CODEQL = re.compile(r"/codeql\.ya?ml(@|$)")
+
+
+def _is_required(job: Job, required: tuple[str, ...]) -> bool:
+    """Whether the catalogue requires this job's context."""
+    if job.calls:
+        prefix = f"{job.id} / "
+        return any(c == job.id or c.startswith(prefix) for c in required)
+    return job.context in required
+
+
+def _covered_by_required(found: list[Job], required: tuple[str, ...]) -> set[str]:
+    """Job ids a required job waits on, directly or through another job.
+
+    The estate's always-reporting gates — `container-build`, `terraform-plan` —
+    are required *instead of* the path-filtered jobs behind them, and fail when
+    those fail. Recommending the jobs behind a gate is recommending exactly the
+    check the gate exists to avoid requiring: one that is skipped on some pull
+    requests and so never reports there.
+    """
+    by_id = {job.id: job for job in found}
+    pending = [need for job in found if _is_required(job, required) for need in job.needs]
+    covered: set[str] = set()
+    while pending:
+        job_id = pending.pop()
+        if job_id in covered or job_id not in by_id:
+            continue
+        covered.add(job_id)
+        pending.extend(by_id[job_id].needs)
+    return covered
 
 
 # Every platform that runs Terraform across this estate: CI is amd64, the dev

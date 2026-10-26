@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -338,8 +339,8 @@ def open_issues(
 # Configurable rather than hard-coded so this is not silently wrong for anyone
 # whose catalogue lives elsewhere, and so an empty setting switches the check off
 # rather than producing a finding against every repository at once.
-def catalogue(client: httpx.Client | None = None) -> dict[str, frozenset[str]] | None:
-    """Every repository `github-repos` declares and the checks it requires.
+def catalogue(client: httpx.Client | None = None) -> dict[str, CatalogueEntry] | None:
+    """Every repository `github-repos` declares and what its ruleset enforces.
 
     **None and empty mean different things.** None is "the catalogue could not be
     read", which must never render as "every repository is unmanaged"; an empty
@@ -384,13 +385,23 @@ def parse_catalogue(text: str) -> frozenset[str]:
     return frozenset(parse_catalogue_entries(text))
 
 
-def parse_catalogue_entries(text: str) -> dict[str, frozenset[str]]:
-    """Each declared repository, mapped to the status checks it requires.
+@dataclass(frozen=True)
+class CatalogueEntry:
+    """What the catalogue's ruleset enforces on one repository."""
 
-    The names are the reason this exists; the contexts ride along because they
-    are in the same block and reading the file twice would be the only
-    alternative. A repository declaring none maps to an empty set, which is
-    different from one that is absent entirely.
+    required_checks: frozenset[str] = frozenset()
+    # `code_scanning = true`: the ruleset blocks merges on new CodeQL alerts,
+    # which is how this estate enforces CodeQL, rather than a status check.
+    code_scanning: bool = False
+
+
+def parse_catalogue_entries(text: str) -> dict[str, CatalogueEntry]:
+    """Each declared repository, mapped to what its ruleset enforces.
+
+    The names are the reason this exists; the contexts and the code scanning
+    flag ride along because they are in the same block and reading the file
+    twice would be the only alternative. A repository declaring no checks maps
+    to an empty set, which is different from one that is absent entirely.
 
     A brace-depth scan rather than a regex over the whole file, because the
     values contain nested blocks — `required_status_checks = [{ context = ... }]`
@@ -402,6 +413,7 @@ def parse_catalogue_entries(text: str) -> dict[str, frozenset[str]]:
     and ignores anything it does not recognise.
     """
     entries: dict[str, set[str]] = {}
+    scanned: set[str] = set()
     current: str | None = None
     depth = 0
     in_repos = False
@@ -428,6 +440,8 @@ def parse_catalogue_entries(text: str) -> dict[str, frozenset[str]]:
             context = re.search(r'\bcontext\s*=\s*"([^"]+)"', line)
             if context:
                 entries[current].add(context.group(1))
+            elif re.match(r"^code_scanning\s*=\s*true\b", line):
+                scanned.add(current)
 
         depth += line.count("{") - line.count("}")
         if depth <= 1:
@@ -435,4 +449,7 @@ def parse_catalogue_entries(text: str) -> dict[str, frozenset[str]]:
         if depth <= 0:
             break
 
-    return {name: frozenset(contexts) for name, contexts in entries.items()}
+    return {
+        name: CatalogueEntry(required_checks=frozenset(contexts), code_scanning=name in scanned)
+        for name, contexts in entries.items()
+    }
