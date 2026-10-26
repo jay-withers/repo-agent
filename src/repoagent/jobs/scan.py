@@ -204,7 +204,12 @@ def _snapshots(
             required_checks=(
                 None
                 if declared is None or repo.name not in declared
-                else tuple(sorted(declared[repo.name]))
+                else tuple(sorted(declared[repo.name].required_checks))
+            ),
+            code_scanning_enforced=(
+                None
+                if declared is None or repo.name not in declared
+                else declared[repo.name].code_scanning
             ),
         )
         for repo in repos

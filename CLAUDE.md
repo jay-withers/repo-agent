@@ -275,7 +275,20 @@ all — the exact failure the mirror check exists for. Three exclusions carry th
 - a job with a matrix, whose context carries the leg (`plan (dev)`) and cannot
   be reconstructed from the workflow text.
 
-Run against this repository's own six workflows it produces nothing, which is
+Two kinds of coverage count as enforced, and both came from one digest that
+reported 20 of the estate's 25 findings wrongly:
+
+- **A job a required job `needs`, directly or transitively.** The estate's
+  always-reporting gates (`container-build`, `terraform-plan`) are required
+  *instead of* the gated jobs behind them (`changes`, `build`, `plan`), and fail
+  when those fail. Recommending the job behind a gate is recommending exactly
+  the check the gate exists to avoid. `needs` is parsed in all three forms.
+- **CodeQL, when the catalogue sets `code_scanning = true`.** The ruleset's code
+  scanning rule blocks merges on new alerts, which is how this estate enforces
+  CodeQL; it is never a required status check. Without the flag the finding
+  says to set it, not to require `codeql / …`.
+
+Run against this repository's own workflows it produces nothing, which is
 the test that matters: those exclusions are what make the difference between
 four correct recommendations on a fresh repository and four wrong ones here.
 

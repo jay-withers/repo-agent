@@ -19,6 +19,8 @@ repos = {
       { context = "pre-commit / Pre-commit" },
       { context = "terraform / Terraform" },
     ]
+    # Runs CodeQL, so new alerts block merges.
+    code_scanning = true
   }
 
   "repo-agent" = {
@@ -50,7 +52,7 @@ def test_nested_blocks_are_not_mistaken_for_repositories() -> None:
 def test_the_catalogue_carries_each_repositorys_required_contexts() -> None:
     entries = parse_catalogue_entries(CATALOGUE)
 
-    assert entries["azure-landingzone"] == frozenset(
+    assert entries["azure-landingzone"].required_checks == frozenset(
         {"pre-commit / Pre-commit", "terraform / Terraform"}
     )
 
@@ -59,8 +61,15 @@ def test_a_repository_requiring_no_checks_is_empty_not_absent() -> None:
     """Declaring no required checks is a different fact from not being declared."""
     entries = parse_catalogue_entries(CATALOGUE)
 
-    assert entries["repo-agent"] == frozenset()
+    assert entries["repo-agent"].required_checks == frozenset()
     assert "not-a-repo" not in entries
+
+
+def test_the_catalogue_carries_the_code_scanning_flag() -> None:
+    entries = parse_catalogue_entries(CATALOGUE)
+
+    assert entries["azure-landingzone"].code_scanning is True
+    assert entries["repo-agent"].code_scanning is False
 
 
 def test_a_catalogue_with_no_repos_block_yields_nothing() -> None:
@@ -541,3 +550,117 @@ def test_topic_matching_ignores_case() -> None:
 
     assert "tutorial" in settings().ignored_topics
     assert "no-scan" in settings().ignored_topics
+
+
+# The estate's gate shape: a path filter decides, the build runs behind it, and
+# an always-reporting gate is the required check. Copied from this repository's
+# own ci-container-build and ci-terraform.
+GATED_WORKFLOW = """\
+name: ci-container-build
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
+  build:
+    needs: changes
+    if: needs.changes.outputs.image == 'true'
+    uses: jay-withers/workflows/docker.yml@b698317b1e5a71597aa412b58d354f15f6c21d77 # v1.14.0
+  container-build:
+    needs: [changes, build]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - run: true
+"""
+
+BLOCK_NEEDS_WORKFLOW = """\
+name: ci-terraform
+on: [pull_request]
+jobs:
+  plan:
+    uses: jay-withers/workflows/terraform-deploy.yml@b698317b1e5a71597aa412b58d354f15f6c21d77
+  terraform-plan:
+    needs:
+      - plan
+    runs-on: ubuntu-24.04
+    steps:
+      - run: true
+"""
+
+CODEQL_WORKFLOW = """\
+name: ci-codeql
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  codeql:
+    uses: jay-withers/workflows/codeql.yml@b698317b1e5a71597aa412b58d354f15f6c21d77 # v1.14.0
+"""
+
+
+def test_jobs_behind_a_required_gate_are_not_recommended() -> None:
+    """`changes` and `build` are covered by `container-build`, which fails when
+    they do. Requiring `build` itself would leave a docs-only PR pending."""
+    assert (
+        estate.unenforced_check(
+            snapshot(
+                workflows=(workflow(name="ci-container-build.yml", text=GATED_WORKFLOW),),
+                required_checks=("container-build",),
+            )
+        )
+        == []
+    )
+
+
+def test_a_gate_covers_through_a_block_list_of_needs() -> None:
+    assert (
+        estate.unenforced_check(
+            snapshot(
+                workflows=(workflow(name="ci-terraform.yml", text=BLOCK_NEEDS_WORKFLOW),),
+                required_checks=("terraform-plan",),
+            )
+        )
+        == []
+    )
+
+
+def test_an_unrequired_gate_still_reports_itself_and_what_it_covers() -> None:
+    findings = estate.unenforced_check(
+        snapshot(
+            workflows=(workflow(name="ci-container-build.yml", text=GATED_WORKFLOW),),
+            required_checks=(),
+        )
+    )
+
+    assert "`container-build`" in findings[0].detail
+
+
+def test_codeql_is_covered_by_the_code_scanning_rule() -> None:
+    assert (
+        estate.unenforced_check(
+            snapshot(
+                workflows=(workflow(name="ci-codeql.yml", text=CODEQL_WORKFLOW),),
+                required_checks=(),
+                code_scanning_enforced=True,
+            )
+        )
+        == []
+    )
+
+
+def test_unenforced_codeql_recommends_code_scanning_not_a_status_check() -> None:
+    findings = estate.unenforced_check(
+        snapshot(
+            workflows=(workflow(name="ci-codeql.yml", text=CODEQL_WORKFLOW),),
+            required_checks=(),
+            code_scanning_enforced=False,
+        )
+    )
+
+    assert len(findings) == 1
+    assert "code_scanning = true" in findings[0].detail
+    assert "`codeql / " not in findings[0].detail
