@@ -138,7 +138,10 @@ def merge_detail(snapshot: RepoSnapshot, detail: dict[str, Any] | None) -> RepoS
         dockerfile=_blob_text(detail.get("dockerfile")),
         has_readme=_blob_text(detail.get("readme")) is not None,
         workflows=tuple(
-            Workflow(name=entry.get("name", ""), text=_blob_text(entry.get("object")) or "")
+            Workflow(
+                name=entry.get("name", ""),
+                text=_blob_text(entry.get("object"), capped=False) or "",
+            )
             for entry in (workflows.get("entries") or [])
             # A Tree lists directories too, and `.github/workflows` legitimately
             # contains non-workflow files that GitHub Actions ignores.
@@ -146,7 +149,10 @@ def merge_detail(snapshot: RepoSnapshot, detail: dict[str, Any] | None) -> RepoS
         ),
         # `terraform/` first, which is this estate's layout; the root is the
         # fallback for a repository that is itself a module.
-        terraform_lock=_blob_text(detail.get("tflock")) or _blob_text(detail.get("tflock_root")),
+        terraform_lock=(
+            _blob_text(detail.get("tflock"), capped=False)
+            or _blob_text(detail.get("tflock_root"), capped=False)
+        ),
         open_prs=open_prs,
         open_pr_total=_count(pr_page.get("totalCount")),
         branches=branches,
@@ -225,7 +231,7 @@ def _renovate_config(detail: dict[str, Any]) -> tuple[str | None, str | None]:
     return None, None
 
 
-def _blob_text(node: Any) -> str | None:
+def _blob_text(node: Any, *, capped: bool = True) -> str | None:
     """The text of a GraphQL Blob, or None where the path does not exist.
 
     A binary blob comes back with `text: null` even though the object exists,
@@ -234,6 +240,13 @@ def _blob_text(node: Any) -> str | None:
 
     Truncated here rather than at the prompt, so that the cap applies to what is
     stored and no later caller can accidentally ship a whole README to the model.
+
+    `capped=False` is for files only the checks read, which must see all of
+    them: a lock file or workflow is never sent to the model, and a truncated
+    one reads as broken. terraform-root-aks's lock is 9.7 KB with `tls` as its
+    last block, starting at byte 7,937, so the 8,000-byte cap left the header
+    and none of its hashes, and `incomplete_terraform_lock` reported
+    `tls (0 of 3)` against a correct lock.
     """
     from .client import MAX_FILE_BYTES
 
@@ -242,6 +255,6 @@ def _blob_text(node: Any) -> str | None:
     text = node.get("text")
     if not isinstance(text, str):
         return None
-    if len(text) <= MAX_FILE_BYTES:
+    if not capped or len(text) <= MAX_FILE_BYTES:
         return text
     return text[:MAX_FILE_BYTES] + "\n… [truncated]"

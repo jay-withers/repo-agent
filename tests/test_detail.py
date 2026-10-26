@@ -277,3 +277,45 @@ def test_merge_folds_branches_and_pr_activity_in() -> None:
 def test_missing_branches_read_as_unknown_not_empty() -> None:
     """A repository always has a default branch, so absence means no answer."""
     assert parse.merge_detail(snapshot(), _detail()).branches is None
+
+
+def test_a_lock_file_past_the_cap_is_read_whole() -> None:
+    """The cap is for what can reach the prompt. A lock file never does, and
+    terraform-root-aks's, cut at 8,000 bytes, kept `tls`'s header and lost its
+    hashes, so a correct lock was reported as `tls (0 of 3)`."""
+    from repoagent.checks import estate
+    from repoagent.github.client import MAX_FILE_BYTES
+
+    block = """provider "registry.terraform.io/hashicorp/{name}" {{
+  version = "1.0.0"
+  hashes = [
+    "h1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=",
+    "h1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb=",
+    "h1:ccccccccccccccccccccccccccccccccccccccccccc=",
+  ]
+}}
+"""
+    padding = "".join(block.format(name=f"p{i}") for i in range(MAX_FILE_BYTES // len(block)))
+    lock = padding + block.format(name="tls")
+    assert lock.index('hashicorp/tls"') < MAX_FILE_BYTES < len(lock)
+
+    merged = parse.merge_detail(snapshot(), _detail(tflock={"text": lock}))
+
+    assert merged.terraform_lock == lock
+    assert estate.incomplete_terraform_lock(merged) == []
+
+
+def test_a_workflow_past_the_cap_is_read_whole() -> None:
+    text = "on: [push]\n" + "#" * 9_000 + "\njobs:\n  late:\n    runs-on: ubuntu-24.04\n"
+    workflows = {"entries": [{"name": "big.yml", "object": {"text": text}}]}
+
+    merged = parse.merge_detail(snapshot(), _detail(workflows=workflows))
+
+    assert merged.workflows[0].text == text
+
+
+def test_a_readme_past_the_cap_is_still_truncated() -> None:
+    """Prompt-bound files keep the cap."""
+    merged = parse.merge_detail(snapshot(), _detail(readme={"text": "x" * 9_000}))
+
+    assert merged.readme is not None and merged.readme.endswith("[truncated]")
