@@ -68,7 +68,17 @@ ENV PATH="/app/.venv/bin:$PATH" \
 # msgpack and setuptools' pkg_resources at whatever versions shipped with it;
 # Trivy reports them (a CRITICAL certifi among them). Nothing at runtime uses
 # pip: the app runs from the venv copied in below, which uv built without one.
-RUN python -m pip uninstall --yes --root-user-action=ignore pip \
+#
+# libssl3 is upgraded in place because the pinned base digest predates
+# CVE-2026-84782's fix (3.0.22-1~deb12u2), and Trivy fails the build on it.
+# Unpinned on purpose: a pinned Debian security version is withdrawn from the
+# mirror when the next one lands, which would break the build instead. Drop
+# this once a base digest ships the fix.
+# hadolint ignore=DL3008
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends --only-upgrade libssl3 \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip uninstall --yes --root-user-action=ignore pip \
     && useradd --system --uid 10001 --create-home --shell /usr/sbin/nologin repoagent
 
 WORKDIR /app
