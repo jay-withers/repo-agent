@@ -240,6 +240,13 @@ provider block** — one per platform locked — and `zh:` entries are the
 registry's zip hashes, present regardless, so counting those proves nothing.
 `test_platform_names_are_never_looked_for_in_a_lock_file` pins this.
 
+**Lock files and workflows are read whole; only prompt-bound files are capped.**
+`_blob_text` truncates at `MAX_FILE_BYTES` (8,000) by default, which once cut
+terraform-root-aks's 9.7 KB lock inside its last block and reported a correct
+lock as `tls (0 of 3)` every week. Workflows had the same problem: four in
+`jay-withers/workflows` are over the cap. Neither ever reaches the model, so
+both pass `capped=False`; README, Dockerfile and Renovate config keep the cap.
+
 **`estate.unreportable_required_check` compares the two halves of that
 catalogue.** It reads `required_status_checks` out of the same block the
 repository names come from, and asks whether any workflow in the repository can
