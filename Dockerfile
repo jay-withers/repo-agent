@@ -69,14 +69,16 @@ ENV PATH="/app/.venv/bin:$PATH" \
 # Trivy reports them (a CRITICAL certifi among them). Nothing at runtime uses
 # pip: the app runs from the venv copied in below, which uv built without one.
 #
-# libssl3 is upgraded in place because the pinned base digest predates
-# CVE-2026-84782's fix (3.0.22-1~deb12u2), and Trivy fails the build on it.
-# Unpinned on purpose: a pinned Debian security version is withdrawn from the
-# mirror when the next one lands, which would break the build instead. Drop
-# this once a base digest ships the fix.
+# The same layer applies Debian's published security fixes. The base image is
+# rebuilt on its own schedule, and in between Trivy fails the build on a
+# fixable HIGH/CRITICAL package (libssl3, CVE-2026-84782, was the first). The
+# CI build caches layers by instruction, so OS_PATCH_DATE (today's date, passed
+# by jay-withers/workflows' docker.yml) is declared just above it: this layer
+# re-runs once a day and everything before it stays cached.
+ARG OS_PATCH_DATE
 # hadolint ignore=DL3008
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends --only-upgrade libssl3 \
+    && apt-get upgrade -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && python -m pip uninstall --yes --root-user-action=ignore pip \
     && useradd --system --uid 10001 --create-home --shell /usr/sbin/nologin repoagent
