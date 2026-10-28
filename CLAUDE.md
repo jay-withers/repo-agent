@@ -725,10 +725,11 @@ the job name and resource group from `terraform output` and calls
 `--set-env-vars` updates only the name given and leaves every other env var
 alone.
 
-`image_tag`'s Terraform default must be a **tag that actually exists** in
-ghcr.io. It seeds only the first revision on a brand-new environment, but a
-default naming a tag nobody pushed fails at revision start-up on an image pull,
-long after plan and apply both report success.
+Terraform creates the job on dev-containers' `placeholder:latest` image,
+which exits 0 at once inside a job, never on a guessed release tag: a tag nobody
+pushed fails at revision start-up on an image pull, long after plan and apply
+both report success. Until the first release's `make deploy`, and after any
+apply that replaces the job, scheduled runs "succeed" doing nothing.
 
 **Flip the GHCR package to public.** New packages default to private regardless
 of repo visibility, and the job has no pull secret.
