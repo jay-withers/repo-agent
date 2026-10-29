@@ -7,7 +7,7 @@
 resource "azurerm_container_app_job" "scan" {
   name                         = module.naming_scan.container_app_job.name
   container_app_environment_id = data.azurerm_container_app_environment.platform.id
-  resource_group_name          = azurerm_resource_group.this.name
+  resource_group_name          = data.azurerm_resource_group.this.name
 
   # The shared environment is Consumption-only. Stated explicitly rather than
   # left to the provider default, because the API reports it back and leaving
@@ -17,7 +17,7 @@ resource "azurerm_container_app_job" "scan" {
   workload_profile_name = "Consumption"
   # Jobs require a location explicitly; container apps inherit the
   # environment's. It must match the environment's region.
-  location = azurerm_resource_group.this.location
+  location = data.azurerm_resource_group.this.location
 
   # The scan makes a few dozen HTTP requests and sends one email. Fifteen
   # minutes is loose rather than considered — it exists so a hung connection

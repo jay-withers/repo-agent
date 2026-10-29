@@ -1,6 +1,6 @@
 output "resource_group_name" {
   description = "This project's resource group."
-  value       = azurerm_resource_group.this.name
+  value       = data.azurerm_resource_group.this.name
 }
 
 output "key_vault_name" {

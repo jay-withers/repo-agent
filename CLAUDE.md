@@ -58,7 +58,8 @@ picks it up on the next deploy, not on apply.
 
 ## The two-repo split
 
-This repo owns its **resource group, Key Vault, managed identity and the job**.
+This repo owns its **Key Vault, managed identity and the job**. Its resource
+group is github-repos' (`create_resource_groups`), read here by data source.
 The Container Apps environment, Log Analytics workspace and Application
 Insights belong to
 [`jay-withers/azure-container-apps`](https://github.com/jay-withers/azure-container-apps)
@@ -73,8 +74,8 @@ stays a convention. Two consequences:
   why there is only `backends/dev.hcl` and `environments/dev.tfvars`. Adding
   stg/prd means the platform must exist there first.
 - **A job may live in a different resource group from its environment, but not
-  a different region.** The resource group therefore takes its location from
-  the environment rather than from a variable of its own, and jobs must set
+  a different region.** github-repos therefore creates the resource group in
+  the environment's region, and jobs must set
   `location` explicitly where container apps inherit it.
 
 This is the first tenant of that environment, so it is also the proof the split
@@ -699,10 +700,10 @@ Renovate auto-merge a Python 3.15 base image that could not build.
   hand** (`workflow_dispatch`), through the same `terraform-deploy.yml`. A
   merge whose plan has changes opens a `terraform-pending` issue, which this
   agent's own `delivery.terraform_pending` check lists; the manual run applies
-  exactly the plan it prints and closes it. The one exception: the
-  identity is Contributor on `rg-repoagent-dev`, which cannot write role
-  assignments, so a change that adds or replaces one fails there and needs a
-  local `make apply ENV=dev`.
+  exactly the plan it prints and closes it. The identity is
+  Contributor and conditioned RBAC Administrator on `rg-repoagent-dev` (both
+  from github-repos, which owns the group), so role assignments inside the
+  group apply there too.
 - **`cd-tag` mints a version on every merge, but `cd-publish` only rebuilds when
   `apps` content changed**, diffed against the previous release tag found with
   `git describe --tags --abbrev=0 HEAD^` rather than the push's own range — so
