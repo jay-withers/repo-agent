@@ -337,8 +337,8 @@ variables, and is posted as a PR comment.
 
 `cd-terraform` plans dev on every merge that touches Terraform, with the same
 shared workflow, and applies only when run by hand (Actions → Run workflow); a
-merge whose plan has changes opens a `terraform-pending` issue until then. A change that adds or replaces a role assignment is the
-exception: the pipeline's identity is only Contributor, so apply that one
-locally with `make apply ENV=dev`.
+merge whose plan has changes opens a `terraform-pending` issue until then. Role assignments inside the
+resource group apply there too: github-repos owns the group and grants the
+pipeline conditioned RBAC Administrator on it.
 
 Generated input/output reference: [`terraform/README.md`](terraform/README.md).
