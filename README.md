@@ -60,6 +60,7 @@ catch elsewhere.
 | `delivery.deploy_failed` | high | Open `deploy-failed` issues: a deploy or apply on main failed and hasn't succeeded since (needs the Issues permission) |
 | `renovate.blocked_prs` | high | Renovate PRs BLOCKED (a required check failing) or DIRTY (conflicts) for 7+ days, named: auto-merge will never take them |
 | `delivery.terraform_pending` | medium | Open `terraform-pending` issues: Terraform changes on main waiting for a manual `cd-terraform` run (needs the Issues permission) |
+| `delivery.deploy_pending` | medium | Open `deploy-pending` issues: a release held from deploying (merged by a person, or carrying a major update) until `cd-publish` is run with its tag (needs the Issues permission) |
 | `renovate.stalled_prs` | medium/high | Updates not being merged, or a backlog nearing `prConcurrentLimit` |
 | `renovate.never_opened_a_pr` | high | Onboarded but never activated: no update has ever landed |
 | `renovate.default_config_only` | low | Generated config nobody ever added a policy to |

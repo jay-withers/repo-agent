@@ -14,18 +14,21 @@ from tests.test_security_checks import _auth_routes
 
 FAILED = delivery.DEPLOY_FAILED_LABEL
 PENDING = delivery.TERRAFORM_PENDING_LABEL
+HELD = delivery.DEPLOY_PENDING_LABEL
 
 
 def test_unknown_issues_are_silent() -> None:
     # None is "could not read" (no Issues permission, or the request failed).
     assert delivery.deploy_failed(snapshot(open_issues=None)) == []
     assert delivery.terraform_pending(snapshot(open_issues=None)) == []
+    assert delivery.deploy_pending(snapshot(open_issues=None)) == []
 
 
 def test_unrelated_issues_are_silent() -> None:
     issues = (issue(labels=("bug",)), issue(number=6, labels=()))
     assert delivery.deploy_failed(snapshot(open_issues=issues)) == []
     assert delivery.terraform_pending(snapshot(open_issues=issues)) == []
+    assert delivery.deploy_pending(snapshot(open_issues=issues)) == []
 
 
 def test_a_failed_deploy_is_high_and_named() -> None:
@@ -52,6 +55,18 @@ def test_pending_terraform_is_medium_and_named() -> None:
     assert finding.check == "delivery.terraform_pending"
     assert finding.severity == "medium"
     assert "#3" in finding.detail and "cd-terraform" in finding.detail
+
+
+def test_a_held_deploy_is_medium_and_named() -> None:
+    issues = (issue(number=9, title="Deploy to dev pending", labels=(HELD,), days_old=2),)
+
+    [finding] = delivery.deploy_pending(snapshot(open_issues=issues))
+
+    assert finding.check == "delivery.deploy_pending"
+    assert finding.severity == "medium"
+    assert "#9 'Deploy to dev pending'" in finding.detail and "cd-publish" in finding.detail
+    assert finding.age_days == 2
+    assert f"label%3A{HELD}" in finding.evidence_url
 
 
 def test_issues_parse_drops_pull_requests_and_keeps_none() -> None:
