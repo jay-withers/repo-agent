@@ -348,10 +348,11 @@ say "at least" when the page does not hold every branch.
 ## Delivery: what the shared workflows are waiting on
 
 `checks.delivery` reads open issues that jay-withers/workflows opens:
-`deploy-failed` (a deploy or apply on main failed; the next success closes it)
-and `terraform-pending` (cd-terraform planned changes on main that nobody has
-applied; applying is a manual run, which closes it). Creating either emails the
-owner once, and the digest is the weekly reminder of whatever is still open.
+`deploy-failed` (a deploy or apply on main failed; the next success closes it),
+`terraform-pending` (cd-terraform planned changes on main that nobody has
+applied; applying is a manual run, which closes it) and `deploy-pending` (a
+release held from deploying; running cd-publish with its tag deploys it and
+closes it). Creating any of them emails the owner once, and the digest is the weekly reminder of whatever is still open.
 
 - **The label names are a contract** with the workflows; the constants in
   `checks/delivery.py` must match them.

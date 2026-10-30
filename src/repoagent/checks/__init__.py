@@ -40,6 +40,7 @@ ALL: tuple[Check, ...] = (
     renovate.stalled_prs,
     # Merged but not yet applied: an action waiting on a human, not a defect.
     delivery.terraform_pending,
+    delivery.deploy_pending,
     renovate.default_config_only,
     # Estate before hygiene: a repository outside the catalogue has nothing
     # enforcing anything on it, which outranks every cosmetic finding below.

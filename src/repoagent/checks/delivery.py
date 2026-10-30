@@ -2,10 +2,12 @@
 
 jay-withers/workflows opens an issue for each: `terraform-pending` when
 `cd-terraform` planned changes on main that have not been applied (applying is
-a manual run), and `deploy-failed` when a deploy or apply on main failed.
-Creating either emails the owner once; these checks are the weekly reminder of
-whatever is still open. Both read `RepoSnapshot.open_issues`, which needs the
-App's Issues permission, and stay silent without it.
+a manual run), `deploy-pending` when a release was published but held from
+deploying (a person merged it, or it carries a major update; deploying is a
+manual `cd-publish` run), and `deploy-failed` when a deploy or apply on main
+failed. Creating any of them emails the owner once; these checks are the
+weekly reminder of whatever is still open. All read `RepoSnapshot.open_issues`,
+which needs the App's Issues permission, and stay silent without it.
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ from ..models import Finding, Issue, RepoSnapshot
 # Must match the labels jay-withers/workflows' terraform-deploy.yml and
 # container-apps-deploy.yml put on the issues they open.
 TERRAFORM_PENDING_LABEL = "terraform-pending"
+DEPLOY_PENDING_LABEL = "deploy-pending"
 DEPLOY_FAILED_LABEL = "deploy-failed"
 
 
@@ -65,6 +68,32 @@ def terraform_pending(snapshot: RepoSnapshot) -> list[Finding]:
                 "the Actions tab to apply; the issue closes itself once nothing is left to apply."
             ),
             evidence_url=_label_url(snapshot, TERRAFORM_PENDING_LABEL),
+            age_days=_oldest(issues),
+        )
+    ]
+
+
+def deploy_pending(snapshot: RepoSnapshot) -> list[Finding]:
+    """Releases published but held from deploying until someone runs cd-publish.
+
+    Medium, like Terraform waiting to be applied: nothing is broken, but main
+    is ahead of dev, and while the hold is open every later release, Renovate's
+    included, waits behind it.
+    """
+    issues = _labelled(snapshot, DEPLOY_PENDING_LABEL)
+    if not issues:
+        return []
+    return [
+        Finding(
+            repo=snapshot.full_name,
+            check="delivery.deploy_pending",
+            severity="medium",
+            title="Releases waiting to be deployed",
+            detail=(
+                f"{_named(issues)}. Each issue names the tag and why it was held. Run cd-publish "
+                "from the Actions tab with that tag; the issue closes itself once it deploys."
+            ),
+            evidence_url=_label_url(snapshot, DEPLOY_PENDING_LABEL),
             age_days=_oldest(issues),
         )
     ]
