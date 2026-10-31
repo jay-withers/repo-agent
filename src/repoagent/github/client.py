@@ -174,7 +174,7 @@ def _file_selection() -> str:
     parts.append('readme: object(expression: "HEAD:README.md") { ... on Blob { text } }')
     # The lock file's *platform hashes* are the point: one missing linux_amd64
     # fails pre-commit in CI on every pull request, which is a trap this estate
-    # has already fallen into. See CLAUDE.md.
+    # has already fallen into. See docs/design.md (GitHub API).
     parts.append(
         'tflock: object(expression: "HEAD:terraform/.terraform.lock.hcl") { ... on Blob { text } }'
     )

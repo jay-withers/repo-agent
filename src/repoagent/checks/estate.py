@@ -311,7 +311,7 @@ def _covered_by_required(found: list[Job], required: tuple[str, ...]) -> set[str
 
 
 # Every platform that runs Terraform across this estate: CI is amd64, the dev
-# containers and laptops are arm64. CLAUDE.md's remedy locks three —
+# containers and laptops are arm64. CLAUDE.md's rule locks three —
 # linux_amd64, linux_arm64, darwin_arm64 — so three is what a complete lock has.
 EXPECTED_LOCK_PLATFORMS = 3
 
