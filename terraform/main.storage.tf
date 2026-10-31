@@ -96,7 +96,7 @@ resource "azurerm_role_assignment" "identity_state_contributor" {
 # The administrators can read and edit the state document by hand — which is
 # what `repoagent suppress` does, running locally against the real blob. Not
 # "whoever applies": cd-terraform applies as the pipeline identity, which would
-# move this grant to itself on every run, and cannot write role assignments.
+# move this grant to itself on every run.
 resource "azurerm_role_assignment" "deployer_state_contributor" {
   for_each = toset(var.key_vault_administrator_object_ids)
 
