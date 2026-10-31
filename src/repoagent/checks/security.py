@@ -7,7 +7,7 @@ unprompted, so an alert can sit open for months on a repository whose every
 check is passing. This is the prompt.
 
 Every code scanning tool, open alerts only. Dependabot and secret scanning
-alerts are still deliberately unread; see CLAUDE.md.
+alerts are still deliberately unread; see docs/checks.md.
 """
 
 from __future__ import annotations

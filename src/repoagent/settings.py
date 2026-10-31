@@ -20,7 +20,7 @@ forbid hyphens, so one of the two has to be rewritten.
 loads `.env` into the `Settings` *class* only — it never touches `os.environ` —
 so a secret written to `.env` was silently ignored and the lookup fell through to
 Key Vault, or failed. Every document in both repositories claimed otherwise. Port
-this back rather than letting the two drift; per CLAUDE.md, the same bug fixed
+this back rather than letting the two drift; per docs/design.md, the same bug fixed
 twice in copied code is the tripwire for extracting a library.
 """
 
