@@ -41,12 +41,6 @@ variable "tags" {
   default     = {}
 }
 
-variable "key_vault_administrator_object_ids" {
-  description = "Entra object IDs granted `Key Vault Secrets Officer` (to populate secret values) and `Storage Blob Data Contributor` on the state container. Listed explicitly rather than taken from whoever runs `terraform apply`, because cd-terraform applies as the pipeline identity."
-  type        = list(string)
-  default     = []
-}
-
 variable "scan_cron_expression" {
   description = "When the scan runs, in UTC. Five fields, no seconds field, so the wall-clock time shifts with British Summer Time. Sunday evening by default, so the digest is waiting on Monday morning but is measured after a full week of Renovate merges rather than an hour into Monday's burst."
   type        = string
