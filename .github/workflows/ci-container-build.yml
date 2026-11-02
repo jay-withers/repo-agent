@@ -53,7 +53,7 @@ jobs:
     permissions:
       contents: read
       security-events: write # Trivy findings to code scanning
-    uses: jay-withers/workflows/.github/workflows/docker.yml@8b7425eeca2c88ce25d82983f451a5386057c503 # v1.17.0
+    uses: jay-withers/workflows/.github/workflows/docker.yml@143441bd0fe9bb4875ffab47c6d7b872b7119389 # v1.24.3
     with:
       images: |
         [{"name": "repoagent", "context": "."}]

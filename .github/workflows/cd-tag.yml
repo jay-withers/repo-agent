@@ -10,7 +10,7 @@ jobs:
   tag:
     permissions:
       contents: write
-    uses: jay-withers/workflows/.github/workflows/release.yml@8b7425eeca2c88ce25d82983f451a5386057c503 # v1.17.0
+    uses: jay-withers/workflows/.github/workflows/release.yml@143441bd0fe9bb4875ffab47c6d7b872b7119389 # v1.24.3
 
   # Whether the image actually needs rebuilding. The shared release.yml's
   # `default-bump` is left at "patch" here, so `tag` bumps *some* version for
