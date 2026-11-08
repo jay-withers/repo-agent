@@ -14,7 +14,7 @@
 # copies the whole virtualenv, and a venv is bound to the exact minor version
 # that created it. See jay-withers/gym-log's Dockerfile for the outage that
 # taught this.
-FROM ghcr.io/jay-withers/dev-containers/python-app-builder:v0.20.13@sha256:d26448d05a54aa4df5798325419da7ddf012b02b84fc17d477a9d87289c4dcad AS builder
+FROM ghcr.io/jay-withers/dev-containers/python-app-builder:v0.20.16@sha256:44a8a15eaa02529e6f66755521e483a030eccb560146ce41b2d2ae55cddf28f0 AS builder
 
 # python-app already sets this; restated because the relative COPYs below
 # depend on it, and hadolint cannot see a WORKDIR set by the parent image.
@@ -37,7 +37,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 
 # Brings /app/.venv/bin on PATH and WORKDIR /app.
-FROM ghcr.io/jay-withers/dev-containers/python-app:v0.20.13@sha256:961c92b9f04da6dc4fce9fa4b5d7b201839f9aa9769bce0b86e15e470b9b15c5
+FROM ghcr.io/jay-withers/dev-containers/python-app:v0.20.16@sha256:d2c801812c245335264fcc27ae33763408ba2461ca6d76e00d10ce64618a3ebb
 
 # This label is what connects the pushed package to this repository, and that
 # connection is what gives a workflow's GITHUB_TOKEN write access to it. Without
