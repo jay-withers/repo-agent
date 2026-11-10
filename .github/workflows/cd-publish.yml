@@ -56,7 +56,7 @@ jobs:
       id-token: write # provenance and SBOM attestations
       attestations: write
       security-events: write # Trivy findings to code scanning
-    uses: jay-withers/workflows/.github/workflows/docker.yml@589b3a68c756a73aeddb5a4d74efe6706d6f24b5 # v1.24.9
+    uses: jay-withers/workflows/.github/workflows/docker.yml@097b8b97138b3af033cab166dd31e84deccf8f9d # v1.24.11
     with:
       images: |
         [{"name": "repoagent", "context": "."}]
@@ -80,7 +80,7 @@ jobs:
       id-token: write
       contents: read
       issues: write # the deploy-failed issue
-    uses: jay-withers/workflows/.github/workflows/container-apps-deploy.yml@589b3a68c756a73aeddb5a4d74efe6706d6f24b5 # v1.24.9
+    uses: jay-withers/workflows/.github/workflows/container-apps-deploy.yml@097b8b97138b3af033cab166dd31e84deccf8f9d # v1.24.11
     with:
       version: ${{ inputs.version }}
       verify-images: ghcr.io/${{ github.repository }}/repoagent
