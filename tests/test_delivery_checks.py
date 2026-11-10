@@ -13,6 +13,7 @@ from tests.test_detail import _detail
 from tests.test_security_checks import _auth_routes
 
 FAILED = delivery.DEPLOY_FAILED_LABEL
+BUILD = delivery.BUILD_FAILED_LABEL
 PENDING = delivery.TERRAFORM_PENDING_LABEL
 HELD = delivery.DEPLOY_PENDING_LABEL
 
@@ -20,6 +21,7 @@ HELD = delivery.DEPLOY_PENDING_LABEL
 def test_unknown_issues_are_silent() -> None:
     # None is "could not read" (no Issues permission, or the request failed).
     assert delivery.deploy_failed(snapshot(open_issues=None)) == []
+    assert delivery.build_failed(snapshot(open_issues=None)) == []
     assert delivery.terraform_pending(snapshot(open_issues=None)) == []
     assert delivery.deploy_pending(snapshot(open_issues=None)) == []
 
@@ -27,6 +29,7 @@ def test_unknown_issues_are_silent() -> None:
 def test_unrelated_issues_are_silent() -> None:
     issues = (issue(labels=("bug",)), issue(number=6, labels=()))
     assert delivery.deploy_failed(snapshot(open_issues=issues)) == []
+    assert delivery.build_failed(snapshot(open_issues=issues)) == []
     assert delivery.terraform_pending(snapshot(open_issues=issues)) == []
     assert delivery.deploy_pending(snapshot(open_issues=issues)) == []
 
@@ -41,6 +44,23 @@ def test_a_failed_deploy_is_high_and_named() -> None:
     assert "#12 'Deploy to dev failed'" in finding.detail
     assert finding.age_days == 4
     assert f"label%3A{FAILED}" in finding.evidence_url
+
+
+def test_a_failed_build_of_main_is_high_and_named() -> None:
+    issues = (issue(number=9, title="Image build on main failed", labels=(BUILD,), days_old=2),)
+
+    [finding] = delivery.build_failed(snapshot(open_issues=issues))
+
+    assert finding.check == "delivery.build_failed"
+    assert finding.severity == "high"
+    assert "#9 'Image build on main failed'" in finding.detail
+    assert finding.age_days == 2
+    assert f"label%3A{BUILD}" in finding.evidence_url
+
+
+def test_a_failed_build_is_not_a_failed_deploy() -> None:
+    issues = (issue(labels=(BUILD,)),)
+    assert delivery.deploy_failed(snapshot(open_issues=issues)) == []
 
 
 def test_pending_terraform_is_medium_and_named() -> None:
@@ -133,6 +153,13 @@ def test_a_freshly_rebased_blocked_pr_is_not_reported() -> None:
     # BLOCKED while its checks run: a day old is not stuck.
     prs = (renovate_pr(days_old=1, merge_state="BLOCKED"),)
     assert renovate.blocked_prs(snapshot(open_prs=prs)) == []
+
+
+def test_mondays_blocked_batch_is_named_on_the_first_sunday() -> None:
+    # Opened late Monday, scanned Sunday 18:00: five whole days old. At seven
+    # days these were named a week later (security-testing#32 at 13 days).
+    prs = (renovate_pr(days_old=5, number=32, merge_state="BLOCKED"),)
+    assert len(renovate.blocked_prs(snapshot(open_prs=prs))) == 1
 
 
 def test_a_blocked_pr_is_not_also_stalled() -> None:

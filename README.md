@@ -58,7 +58,8 @@ catch elsewhere.
 | `renovate.missing_config` | high | No config at any path Renovate reads |
 | `renovate.onboarding_unmerged` | high | Onboarding PR never merged, so Renovate opens nothing |
 | `delivery.deploy_failed` | high | Open `deploy-failed` issues: a deploy or apply on main failed and hasn't succeeded since (needs the Issues permission) |
-| `renovate.blocked_prs` | high | Renovate PRs BLOCKED (a required check failing) or DIRTY (conflicts) for 7+ days, named: auto-merge will never take them |
+| `delivery.build_failed` | high | Open `build-failed` issues: a scheduled build of main failed (doesn't build, or Trivy's gate), so every PR's `container-build` fails until it's fixed (needs the Issues permission) |
+| `renovate.blocked_prs` | high | Renovate PRs BLOCKED (a required check failing) or DIRTY (conflicts) for 5+ days, named: auto-merge will never take them |
 | `delivery.terraform_pending` | medium | Open `terraform-pending` issues: Terraform changes on main waiting for a manual `cd-terraform` run (needs the Issues permission) |
 | `delivery.deploy_pending` | medium | Open `deploy-pending` issues: a release held from deploying (merged by a person, or carrying a major update) until `cd-publish` is run with its tag (needs the Issues permission) |
 | `renovate.stalled_prs` | medium/high | Updates not being merged, or a backlog nearing `prConcurrentLimit` |

@@ -28,6 +28,9 @@ ALL: tuple[Check, ...] = (
     # First: a failed deploy means a release is not running, which outranks
     # anything about how updates arrive.
     delivery.deploy_failed,
+    # Next: a main that no longer builds fails every PR's container-build, so
+    # it is the cause of whatever `blocked_prs` finds below it.
+    delivery.build_failed,
     renovate.missing_config,
     renovate.onboarding_unmerged,
     # Above `stalled_prs`: a repository that has never had an update at all
