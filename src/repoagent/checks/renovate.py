@@ -20,10 +20,12 @@ from ..models import Finding, PullRequest, RepoSnapshot
 STALE_PR_DAYS = 21
 
 # How long a Renovate PR may sit BLOCKED or DIRTY before `blocked_prs` names it.
-# Longer than a check run, so a freshly rebased PR whose checks are still going
-# never counts; short enough that one Monday batch that broke is caught the
-# following Sunday.
-BLOCKED_PR_DAYS = 7
+# Coupled to the Sunday 18:00 scan like `BACKLOG_MIN_AGE_DAYS`: Monday's batch
+# is 5-6 whole days old when the scan sees it, so this must be 5 or that batch
+# is missed and named a week later. At 7 it was, and security-testing#32 and
+# terraform-root-aks#91 first appeared at 13 and 12 days. Still far longer than
+# a check run, so a PR whose checks are merely still going never counts.
+BLOCKED_PR_DAYS = 5
 
 # How many PRs a finding names before it stops listing.
 MAX_NAMED = 10
@@ -165,7 +167,7 @@ def stalled_prs(snapshot: RepoSnapshot) -> list[Finding]:
 
 
 def blocked_prs(snapshot: RepoSnapshot) -> list[Finding]:
-    """Renovate PRs that have been unable to merge for a week.
+    """Renovate PRs that have been unable to merge since the Monday batch.
 
     `stalled_prs` reports a backlog, which reads like a schedule problem. This
     is a different fact and a worse one: GitHub reports the PR as BLOCKED (a
@@ -176,9 +178,10 @@ def blocked_prs(snapshot: RepoSnapshot) -> list[Finding]:
     CVE fixes included, stayed frozen behind them. Named PR by PR, because the
     fix is in the PR: read its failing check.
 
-    A week rather than `STALE_PR_DAYS`, because a blocked PR is not waiting
-    for anything; and not less, because a freshly rebased PR reads BLOCKED
-    while its checks are still running.
+    `BLOCKED_PR_DAYS` rather than `STALE_PR_DAYS`, because a blocked PR is not
+    waiting for anything: short enough to name the first Sunday after the
+    Monday batch, long enough that a freshly rebased PR whose checks are still
+    running never counts.
     """
     blocked = []
     for pr in snapshot.renovate_prs:

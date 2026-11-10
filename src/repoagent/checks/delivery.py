@@ -4,10 +4,12 @@ jay-withers/workflows opens an issue for each: `terraform-pending` when
 `cd-terraform` planned changes on main that have not been applied (applying is
 a manual run), `deploy-pending` when a release was published but held from
 deploying (a person merged it, or it carries a major update; deploying is a
-manual `cd-publish` run), and `deploy-failed` when a deploy or apply on main
-failed. Creating any of them emails the owner once; these checks are the
-weekly reminder of whatever is still open. All read `RepoSnapshot.open_issues`,
-which needs the App's Issues permission, and stay silent without it.
+manual `cd-publish` run), `deploy-failed` when a deploy or apply on main
+failed, and `build-failed` when a scheduled build of main fails (it no longer
+builds, or Trivy's gate found a fixable vulnerability). Creating any of them
+emails the owner once; these checks are the weekly reminder of whatever is
+still open. All read `RepoSnapshot.open_issues`, which needs the App's Issues
+permission, and stay silent without it.
 """
 
 from __future__ import annotations
@@ -16,11 +18,12 @@ from datetime import UTC, datetime
 
 from ..models import Finding, Issue, RepoSnapshot
 
-# Must match the labels jay-withers/workflows' terraform-deploy.yml and
-# container-apps-deploy.yml put on the issues they open.
+# Must match the labels jay-withers/workflows' terraform-deploy.yml,
+# container-apps-deploy.yml and docker.yml put on the issues they open.
 TERRAFORM_PENDING_LABEL = "terraform-pending"
 DEPLOY_PENDING_LABEL = "deploy-pending"
 DEPLOY_FAILED_LABEL = "deploy-failed"
+BUILD_FAILED_LABEL = "build-failed"
 
 
 def deploy_failed(snapshot: RepoSnapshot) -> list[Finding]:
@@ -43,6 +46,34 @@ def deploy_failed(snapshot: RepoSnapshot) -> list[Finding]:
                 "it; the next successful run closes the issue."
             ),
             evidence_url=_label_url(snapshot, DEPLOY_FAILED_LABEL),
+            age_days=_oldest(issues),
+        )
+    ]
+
+
+def build_failed(snapshot: RepoSnapshot) -> list[Finding]:
+    """Scheduled builds of main that failed and have not succeeded since.
+
+    High: until main builds and passes Trivy again, every pull request's
+    `container-build` fails the same way, so no Renovate PR can merge, and the
+    next release can't be built. docker.yml opens the issue the day it happens;
+    this is the weekly reminder while it stays open.
+    """
+    issues = _labelled(snapshot, BUILD_FAILED_LABEL)
+    if not issues:
+        return []
+    return [
+        Finding(
+            repo=snapshot.full_name,
+            check="delivery.build_failed",
+            severity="high",
+            title="Image build on main is failing",
+            detail=(
+                f"{_named(issues)}. The issue links the failed run: the image no longer builds, "
+                "or Trivy found a fixable CRITICAL/HIGH vulnerability. Fix it on main; every "
+                "Renovate PR fails container-build until then. The next green build closes it."
+            ),
+            evidence_url=_label_url(snapshot, BUILD_FAILED_LABEL),
             age_days=_oldest(issues),
         )
     ]

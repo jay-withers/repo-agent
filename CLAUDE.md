@@ -71,13 +71,13 @@ make state     # print what the scan remembers between runs
   unknown.
 - Repos with a topic in `ignore_topics` (`no-scan,tutorial`) are skipped but
   named in the digest.
-- The `deploy-failed` / `terraform-pending` / `deploy-pending` **label names
+- The `deploy-failed` / `build-failed` / `terraform-pending` / `deploy-pending` **label names
   are a contract** with jay-withers/workflows
   ([delivery](docs/checks.md#delivery-what-the-shared-workflows-are-waiting-on)).
 - Lock files and workflows are read whole (`capped=False`). Only prompt-bound
   files are capped.
-- **The scan runs Sunday 18:00 UTC, and `BACKLOG_MIN_AGE_DAYS` is coupled to
-  it.** Move one and the other moves with it
+- **The scan runs Sunday 18:00 UTC, and `BACKLOG_MIN_AGE_DAYS` and
+  `BLOCKED_PR_DAYS` are coupled to it.** Move one and the other moves with it
   ([schedule](docs/checks.md#the-scan-runs-on-sunday-and-that-is-load-bearing)).
 
 ### The model ([what it may do](docs/design.md#the-checks-and-what-the-model-is-allowed-to-do))

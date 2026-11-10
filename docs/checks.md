@@ -200,6 +200,9 @@ say "at least" when the page does not hold every branch.
 
 `checks.delivery` reads open issues that jay-withers/workflows opens:
 `deploy-failed` (a deploy or apply on main failed; the next success closes it),
+`build-failed` (a scheduled build of main failed to build or failed Trivy's
+gate, so every PR's `container-build` fails with it; the next green build
+closes it),
 `terraform-pending` (cd-terraform planned changes on main that nobody has
 applied; applying is a manual run, which closes it) and `deploy-pending` (a
 release held from deploying; running cd-publish with its tag deploys it and
@@ -217,7 +220,7 @@ closes it). Creating any of them emails the owner once, and the digest is the we
 ## Renovate PRs that cannot merge
 
 `renovate.blocked_prs` names Renovate PRs whose `mergeStateStatus` has been
-BLOCKED (a required check failing) or DIRTY (conflicts) for a week. It exists
+BLOCKED (a required check failing) or DIRTY (conflicts) for 5 days. It exists
 because `stalled_prs` reports a *backlog*, which reads like a schedule problem,
 while a blocked PR is broken: auto-merge will never take it, and Renovate
 rebases it every week for ever. The lock-file maintenance PRs sat exactly like
@@ -228,7 +231,12 @@ stayed frozen. The digest said "not being merged" each week and never said why.
 - `mergeStateStatus` needs only Pull requests: read. `statusCheckRollup` would
   say more but wants the Checks permission too, and a permission failure in
   GraphQL fails the whole detail batch.
-- A week, because a freshly rebased PR reads BLOCKED while its checks run.
+- **5 days, coupled to the Sunday scan** like `BACKLOG_MIN_AGE_DAYS`: Monday's
+  batch is 5-6 whole days old at Sunday 18:00. It was a week, which missed
+  that batch every time and named it the Sunday after: security-testing#32
+  and terraform-root-aks#91 first appeared at 13 and 12 days (November 2026).
+  Still far longer than a check run, so a PR whose checks are merely running
+  never counts.
 - `stalled_prs` skips blocked PRs, so each PR is reported once.
 
 ## Onboarded is not activated
@@ -301,7 +309,8 @@ worth knowing:
   a week or every healthy repository read as backlogged; on Sunday it is 2,
   because a batch that never merged is six days old when the scan sees it.
   Move the cron and this number moves with it, in the same direction — too high
-  on a Sunday scan and a week's failed batch is missed entirely.
+  on a Sunday scan and a week's failed batch is missed entirely. The same holds
+  for `BLOCKED_PR_DAYS` (5).
 
 The count itself is measured against the preset's `prConcurrentLimit: 20`,
 **not** Renovate's default of 10.
