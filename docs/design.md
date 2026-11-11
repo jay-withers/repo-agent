@@ -302,9 +302,8 @@ virtualenv, so the image fails with a bare `No module named 'repoagent'` from a
 venv that looks complete. `--no-editable` on both syncs is the fix.
 
 Dockerfiles are linted by the local `scripts/hadolint.sh`, **not** the upstream
-`hadolint-docker` hook — that one calls `docker system info`, which fails
-whenever `DOCKER_HOST` is unset, and pre-commit run from `git commit` inherits
-a non-login shell where the dev container's profile snippet has not run.
+`hadolint-docker` hook — that one calls `docker system info` and buries an
+unreachable daemon in a wall of JSON; the wrapper says what is wrong instead.
 
 **QEMU emulation swallows Python logging.** An amd64 image run under emulation
 on arm64 exited 1 with **zero bytes** on both streams; the same image built
