@@ -100,7 +100,9 @@ def test_issues_parse_drops_pull_requests_and_keeps_none() -> None:
         },
         {"number": 2, "title": "a PR", "labels": [], "pull_request": {"url": "x"}},
     ]
-    [only] = parse.issues(raw)
+    parsed = parse.issues(raw)
+    assert parsed is not None
+    [only] = parsed
     assert only.number == 1 and only.labels == (FAILED,)
     assert parse.issues(None) is None
 

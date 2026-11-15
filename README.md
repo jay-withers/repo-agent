@@ -184,8 +184,9 @@ make run                # scans real GitHub, prints the digest, sends nothing
 email, and it needs `RESEND_API_KEY` and `DIGEST_EMAIL_TO`.
 
 ```bash
-make test    # the suite; no network, no Azure, no credentials
-make lint    # every pre-commit hook
+make test      # the suite; no network, no Azure, no credentials
+make typecheck # mypy; CI runs it too
+make lint      # every pre-commit hook
 ```
 
 ### Don't trust logs from a locally emulated image

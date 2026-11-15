@@ -20,6 +20,7 @@ The important parts are unchanged and worth restating:
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -48,7 +49,9 @@ def rsa_private_key() -> str:
 
 
 @pytest.fixture(autouse=True)
-def fake_secrets(monkeypatch: pytest.MonkeyPatch, rsa_private_key: str, tmp_path: Path) -> None:
+def fake_secrets(
+    monkeypatch: pytest.MonkeyPatch, rsa_private_key: str, tmp_path: Path
+) -> Iterator[None]:
     # First, before anything reads a setting: somewhere with no `.env` in it.
     monkeypatch.chdir(tmp_path)
 

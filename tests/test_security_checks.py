@@ -55,9 +55,11 @@ def test_trivy_and_codeql_alerts_are_one_finding_naming_both_tools() -> None:
 
 
 def test_parse_reads_the_tool_name() -> None:
-    [alert] = parse.code_scanning_alerts(
+    alerts = parse.code_scanning_alerts(
         [{"number": 1, "rule": {"id": "CVE-1"}, "tool": {"name": "Trivy"}}]
     )
+    assert alerts is not None
+    [alert] = alerts
     assert alert.tool == "Trivy"
 
 

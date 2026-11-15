@@ -2,12 +2,26 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import httpx
 
 from repoagent import digest
 from repoagent.jobs import scan
 from repoagent.models import ScanResult
+from repoagent.state import State
 from tests.helpers import route_client
+
+
+def _recording(saved: list[State]) -> Callable[[State], bool]:
+    """A stand-in for state.save that keeps what it was given and succeeds."""
+
+    def save(document: State) -> bool:
+        saved.append(document)
+        return True
+
+    return save
+
 
 _REPOS = {
     "total_count": 2,
@@ -167,6 +181,7 @@ def test_the_footer_reports_what_triage_cost_and_what_is_left() -> None:
         ),
     )
 
+    assert result.usage is not None
     footer = digest.triage_footer(result.usage)
 
     assert "deepseek-flash" in footer
@@ -189,8 +204,8 @@ def test_render_does_not_save_state(monkeypatch) -> None:
     """Running `make run` twice must not rob Monday's email of its deltas."""
     from repoagent import state
 
-    saved: list[object] = []
-    monkeypatch.setattr(state, "save", lambda s: saved.append(s) or True)
+    saved: list[State] = []
+    monkeypatch.setattr(state, "save", _recording(saved))
 
     scan.run(
         send_email=False,
@@ -206,8 +221,8 @@ def test_a_skipped_email_does_not_save_state(monkeypatch) -> None:
     """A run that reported nothing must not record its findings as seen."""
     from repoagent import state
 
-    saved: list[object] = []
-    monkeypatch.setattr(state, "save", lambda s: saved.append(s) or True)
+    saved: list[State] = []
+    monkeypatch.setattr(state, "save", _recording(saved))
 
     # No DIGEST_EMAIL_TO, so mailer returns `skipped`.
     scan.run(
@@ -226,8 +241,8 @@ def test_a_sent_email_saves_state(monkeypatch) -> None:
     from repoagent import state
 
     settings_module.optional_secret.cache_clear()
-    saved: list[object] = []
-    monkeypatch.setattr(state, "save", lambda s: saved.append(s) or True)
+    saved: list[State] = []
+    monkeypatch.setattr(state, "save", _recording(saved))
 
     scan.run(
         send_email=True,
@@ -283,8 +298,8 @@ def test_suggestions_are_not_written_to_state(monkeypatch) -> None:
     from repoagent import state
 
     settings_module.optional_secret.cache_clear()
-    saved: list[object] = []
-    monkeypatch.setattr(state, "save", lambda s: saved.append(s) or True)
+    saved: list[State] = []
+    monkeypatch.setattr(state, "save", _recording(saved))
 
     scan.run(
         send_email=True,

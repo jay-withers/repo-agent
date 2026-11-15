@@ -88,8 +88,8 @@ def render_text(result: ScanResult) -> str:
     # encouraging line in the email and it belongs where it will be read.
     if result.resolved:
         lines.append(f"Resolved since last run ({len(result.resolved)}):")
-        for repo, title in result.resolved:
-            lines.append(f"  {repo}: {title}")
+        for full_name, title in result.resolved:
+            lines.append(f"  {full_name}: {title}")
         lines.append("")
 
     if result.suppressed_count:

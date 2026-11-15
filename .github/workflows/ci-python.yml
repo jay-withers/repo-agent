@@ -1,6 +1,6 @@
 name: ci-python
 
-# Runs the test suite on a pull request.
+# Runs the test suite, mypy and the diff-coverage gate on a pull request.
 #
 # The mechanics live in jay-withers/workflows, so every repo of ours gets the
 # same job and a fix lands once. Only what is specific to this repo is here.
@@ -31,10 +31,9 @@ jobs:
     # python-version matches the python:3.14 base in the Dockerfile, so a pass
     # here is a pass on the interpreter Container Apps runs.
     #
-    # Deliberately not path filtered: the suite takes under a second, and a
-    # required check skipped by a path filter never reports, which blocks a pull
-    # request rather than passing it.
-    uses: jay-withers/workflows/.github/workflows/python.yml@1961dfbd65114641c5fcfd4677a7ca3f0668e513 # v1.26.1
+    # Deliberately not path filtered: a required check skipped by a path filter
+    # never reports, which blocks a pull request rather than passing it.
+    uses: jay-withers/workflows/.github/workflows/python.yml@80eaaece845470ae15cb01af2cb859afcd01a66d # v1.28.0
     with:
       # The package is at the repository root; there is one deliverable and no
       # apps/ nesting to point at.
@@ -47,5 +46,10 @@ jobs:
       # SDK path is mocked, which asserts the mock rather than the behaviour.
       coverage: repoagent
       coverage-pr-comment: true
+      # The total above is never gated; diff-coverage gates only the lines a PR
+      # changes, where the cheap way to pass is to test the new code. A test that
+      # only asserts a mock still counts, so review the tests too.
+      diff-coverage: "80"
+      typecheck: mypy
       # No `postgres` input: this project has no database. That is the whole
       # reason the shared platform carries none.
