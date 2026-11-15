@@ -274,6 +274,7 @@ def test_peak_rates_are_double(api_key: None) -> None:
 
     assert not off.peak
     assert peak.peak
+    assert off.cost_usd is not None
     assert peak.cost_usd == pytest.approx(off.cost_usd * 2)
 
 
