@@ -1,7 +1,8 @@
 # repo-agent
 
 Scans every GitHub repository this App is installed on, checks that Renovate is
-actually doing its job, and emails a weekly digest.
+actually doing its job, and emails a weekly digest. The scan runs Sunday at
+18:00 UTC, so the digest is waiting on Monday morning.
 
 Runs as a scheduled Container Apps job on the shared environment in
 [jay-withers/azure-container-apps](https://github.com/jay-withers/azure-container-apps).
@@ -189,6 +190,23 @@ make typecheck # mypy; CI runs it too
 make lint      # every pre-commit hook
 ```
 
+Against the deployed job (`az login`):
+
+```bash
+make start         # trigger one scan now
+make logs          # the latest execution's logs
+make state         # what the scan remembers between runs, suppressions included
+make deployed-tag  # the image tag live on the job
+make secrets       # print the az commands that set the Key Vault secrets
+```
+
+Terraform: `make validate` (no credentials), `make fmt`, `make plan`, and
+`make apply` for the first apply only (see [First-time setup](#first-time-setup)).
+`make` with no target lists everything.
+
+The reasoning behind the design, and each check's history, are in
+[docs/design.md](docs/design.md) and [docs/checks.md](docs/checks.md).
+
 ### Don't trust logs from a locally emulated image
 
 `make build` cross-builds `linux/amd64` because that is all Container Apps
@@ -234,6 +252,7 @@ belongs in source or in state. `make secrets` prints the exact commands:
 | `GITHUB-APP-PRIVATE-KEY` | The PEM. Use `--file`, not `--value` — its newlines matter, and a shell-quoted value mangles them into a key that fails to parse |
 | `RESEND-API-KEY` | |
 | `DIGEST-EMAIL-TO` | Absent means build the digest and send nothing, so email is opt-in. Must be plain ASCII |
+| `DEEPSEEK-API-KEY` | Optional. Absent switches triage off and the digest goes out without commentary (see [Design](#design)) |
 
 That last one is not hypothetical: market-agent lost a day's summary to a
 recipient stored with curly quotes pasted from something that autocorrects,
@@ -299,9 +318,9 @@ pulls it:
 
 1. Apply `azure-container-apps` (dev).
 2. Create the GitHub App **and install it** — two separate actions, and the
-   second is easy to miss. Needs `Metadata`, `Contents` and `Pull requests`,
-   all read-only, plus read-only `Code scanning alerts` for the code scanning check and read-only `Issues` for the delivery checks, and **All repositories** so a new repo is covered with no
-   config change. Changing permissions on an existing installation raises a
+   second is easy to miss. Give it the read-only permissions listed under
+   [The GitHub App](#the-github-app), on **All repositories** so a new repo is
+   covered with no config change. Changing permissions on an existing installation raises a
    request that has to be accepted before it takes effect.
 3. Merge to `main` here — `cd-tag` mints a version, `cd-publish` pushes the image.
 4. **Check the GHCR package is public** — the job has no pull secret, so a
@@ -325,6 +344,21 @@ Thin callers of reusable workflows in
 commit SHA with the tag as a comment. Because they are reusable-workflow calls,
 the status check contexts are namespaced `<caller job id> / <reusable job name>`
 — read them off `gh pr checks` rather than inferring them.
+
+Required checks (set in github-repos): `pre-commit / Pre-commit`,
+`test / Test`, `terraform / Terraform`, `terraform-plan` and
+`container-build`.
+
+- **ci-pre-commit**: every hook.
+- **ci-python** (`test / Test`): pytest, mypy over `src/` and `tests/`, and
+  diff coverage — at least 80% of the lines a PR changes in `repoagent` must
+  be run by a test.
+- **ci-codeql**: CodeQL code scanning of the workflows.
+- **cd-tag** → **cd-publish**: a release on every merge; when app files
+  changed, the image is published and deployed (see [Deploying](#deploying)).
+- **schedule-drift**: a nightly plan of dev, recorded in the platform's
+  `OpsEvents_CL` table. **manual-terraform-unlock** releases a stuck state
+  lock.
 
 `ci-container-build`'s **`container-build`** gate is a required check. The
 workflow runs on every pull request; a `changes` job decides whether the image
