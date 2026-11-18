@@ -1,36 +1,33 @@
 """Configuration and secret resolution.
 
-Copied from jay-withers/market-agent apps/marketagent/src/marketagent/settings.py
-and trimmed: the database, broker and API fields have no counterpart here. The
-secret-resolution machinery below is unchanged — re-copy rather than diverge.
+`Settings` is this job's own. Secret resolution comes from jay-withers/appkit
+(`appkit.keyvault`), shared with career, finances, gym-log and the other agent;
+fix a bug there, once. The wrappers below bind it to these settings and cache
+it, so a test can clear them.
 
-Every secret is read from an environment variable first and only then from Key
-Vault. That ordering is what makes `repoagent render` work against a local
-`.env` with no Azure involved at all, and it is why Terraform does not manage
-Container Apps Key Vault references: a revision carrying one hard-fails if the
-secret is absent, whereas this resolves at runtime and simply reports what is
-missing.
+Every secret is read from an environment variable first, then `.env`, and only
+then from Key Vault. That ordering is what makes a local run work with no
+Azure involved, and it is why Terraform manages no Container Apps Key Vault
+reference: a revision carrying one hard-fails if the secret is absent, whereas
+this resolves at runtime and reports what is missing.
 
-The name mapping is mechanical: `secret("GITHUB-APP-ID")` reads
-`$GITHUB_APP_ID`, then `.env`, then the Key Vault secret named `GITHUB-APP-ID`.
-Key Vault forbids underscores in names, environment variables conventionally
-forbid hyphens, so one of the two has to be rewritten.
-
-**Diverges from market-agent: the `.env` step is new here.** `SettingsConfigDict`
-loads `.env` into the `Settings` *class* only — it never touches `os.environ` —
-so a secret written to `.env` was silently ignored and the lookup fell through to
-Key Vault, or failed. Every document in both repositories claimed otherwise. Port
-this back rather than letting the two drift; per docs/design.md, the same bug fixed
-twice in copied code is the tripwire for extracting a library.
+The name mapping is mechanical: `secret("RESEND-API-KEY")` reads
+`$RESEND_API_KEY`, then `.env`, then the Key Vault secret named
+`RESEND-API-KEY`. Key Vault forbids underscores in names, environment variables
+conventionally forbid hyphens, so one of the two has to be rewritten.
 """
 
 from __future__ import annotations
 
-import os
-import time
 from functools import cache, lru_cache
 from typing import Any
 
+from appkit import keyvault
+
+# Re-exported: the tests (and conftest's cache clearing) reach them here.
+from appkit.keyvault import KEY_VAULT_SCOPE as KEY_VAULT_SCOPE
+from appkit.keyvault import StaticTokenCredential as StaticTokenCredential
+from appkit.keyvault import dotenv as dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -125,163 +122,28 @@ def settings() -> Settings:
     return Settings()
 
 
-@lru_cache(maxsize=1)
-def dotenv() -> dict[str, str]:
-    """`.env` as a plain dict, or empty when there is no such file.
-
-    Read with the same parser `Settings` uses, so a value quoted for one is
-    quoted for the other — which matters for `GITHUB_APP_PRIVATE_KEY`, a PEM
-    whose newlines only survive as `\n` inside quotes.
-
-    Resolved relative to the working directory rather than to this file: `.env`
-    belongs to whoever is running the command, and in the image there is none.
-    """
-    from dotenv import dotenv_values
-
-    return {key: value for key, value in dotenv_values(".env").items() if value is not None}
-
-
 @cache
 def secret(name: str) -> str:
-    """Resolve a secret by its hyphenated Key Vault name.
-
-    Cached: this process reads each secret once and then exits, so the cache is
-    about not paying for the same round trip twice within a run rather than
-    about long-lived reuse.
-    """
-    from_env = _from_environment(name)
-    if from_env:
-        return from_env
-
-    uri = settings().key_vault_uri
-    if not uri:
-        raise RuntimeError(
-            f"{name} is not set and no KEY_VAULT_URI is configured. "
-            f"Set ${name.replace('-', '_').upper()} locally, or "
-            f"`az keyvault secret set --name {name}` for a deployed environment."
-        )
-
-    # Imported here rather than at module scope so the models, the checks and
-    # the tests never need the Azure SDK installed or a credential present.
-    from azure.keyvault.secrets import SecretClient
-
-    client = SecretClient(vault_url=uri, credential=credential())
-    return client.get_secret(name).value or ""
+    """Resolve a secret by its hyphenated Key Vault name, raising if it is absent."""
+    return keyvault.resolve(name, key_vault_uri=settings().key_vault_uri, credential=credential)
 
 
 @cache
 def optional_secret(name: str) -> str | None:
     """Resolve a secret that is allowed not to exist, returning None if it does not.
 
-    For values that switch a behaviour on rather than being required to run —
-    the digest's recipient is the case this exists for. `secret()` raising is
-    right for a credential the job cannot work without, and wrong for a setting
-    whose absence means "don't do that bit".
-
-    **Absence is not the same as failure.** A missing env var, no vault
-    configured, or a secret that is not in the vault all return None; an
-    authentication or network error propagates, because "the credential is
-    broken" must not look like "no recipient configured".
+    An authentication or network error still raises: "the credential is broken"
+    must not look like "not configured".
     """
-    from_env = _from_environment(name)
-    if from_env:
-        return from_env
-
-    uri = settings().key_vault_uri
-    if not uri:
-        return None
-
-    from azure.core.exceptions import ResourceNotFoundError
-    from azure.keyvault.secrets import SecretClient
-
-    client = SecretClient(vault_url=uri, credential=credential())
-    try:
-        return client.get_secret(name).value or None
-    except ResourceNotFoundError:
-        return None
-
-
-def _from_environment(name: str) -> str | None:
-    """A secret from the process environment, then `.env`.
-
-    The real environment wins, so an inline `FOO=bar make run` overrides a
-    checked-out `.env` rather than being silently ignored by it.
-    """
-    variable = name.replace("-", "_").upper()
-    return os.environ.get(variable) or dotenv().get(variable)
-
-
-# The scope a Key Vault data-plane token is issued for. `az` calls the same
-# thing `--resource https://vault.azure.net`.
-KEY_VAULT_SCOPE = "https://vault.azure.net/.default"
-
-
-class StaticTokenCredential:
-    """A credential wrapping one pre-fetched access token.
-
-    Exists for the containerised local loop. The application image carries no
-    `az`, so `DefaultAzureCredential` has nothing to fall back to and a
-    container cannot reach Key Vault on its own — the alternative was writing
-    the GitHub App private key to a `.env` in plaintext. Passing in a token
-    instead is strictly better: it expires in about an hour, it is scoped to
-    Key Vault alone, and no long-lived secret touches the filesystem.
-
-    Never used in Azure, where the managed identity is available directly.
-    """
-
-    def __init__(self, token: str, scope: str = KEY_VAULT_SCOPE) -> None:
-        self._token = token
-        self._scope = scope
-        # az does not report the expiry in a form worth parsing here, and the
-        # SDK only uses this to decide whether to refresh — which this
-        # credential cannot do. An hour matches the real lifetime; an expired
-        # token then fails as a 401 from Key Vault, which is the honest outcome.
-        self._expires_on = int(time.time()) + 3600
-
-    def _check(self, scopes: tuple[str, ...]) -> None:
-        """Refuse a scope this token was not issued for."""
-        if scopes and self._scope not in scopes:
-            raise ValueError(f"this token is scoped to {self._scope}, not {', '.join(scopes)}")
-
-    def get_token(self, *scopes: str, **_kwargs: Any) -> Any:
-        from azure.core.credentials import AccessToken
-
-        self._check(scopes)
-        return AccessToken(self._token, self._expires_on)
-
-    def get_token_info(self, *scopes: str, **_kwargs: Any) -> Any:
-        """The newer protocol; some SDK versions call this instead."""
-        from azure.core.credentials import AccessTokenInfo
-
-        self._check(scopes)
-        return AccessTokenInfo(self._token, self._expires_on)
+    return keyvault.resolve_optional(
+        name, key_vault_uri=settings().key_vault_uri, credential=credential
+    )
 
 
 @lru_cache(maxsize=1)
-def credential():
-    """The credential for Key Vault.
-
-    Three cases, in priority order:
-
-    1. A pre-fetched Key Vault token from the environment — the containerised
-       local loop, where there is no `az` to fall back to.
-    2. The user-assigned identity, named explicitly. In Azure this must be
-       explicit: `DefaultAzureCredential` would find the same identity
-       eventually, but a workload with more than one identity attached picks
-       unpredictably, and the failure looks like a permissions problem rather
-       than a wrong-identity one.
-    3. `DefaultAzureCredential`, which picks up a developer's `az login`.
-    """
+def credential() -> Any:
+    """The credential for Key Vault and the state blob (`appkit.keyvault.make_credential`)."""
     cfg = settings()
-
-    if cfg.azure_keyvault_token:
-        return StaticTokenCredential(cfg.azure_keyvault_token)
-
-    if cfg.azure_client_id:
-        from azure.identity import ManagedIdentityCredential
-
-        return ManagedIdentityCredential(client_id=cfg.azure_client_id)
-
-    from azure.identity import DefaultAzureCredential
-
-    return DefaultAzureCredential()
+    return keyvault.make_credential(
+        keyvault_token=cfg.azure_keyvault_token, client_id=cfg.azure_client_id
+    )

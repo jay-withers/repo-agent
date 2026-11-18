@@ -119,14 +119,12 @@ Vault.** That is what makes `make run` work with no Azure at all, and it is why
 `.env.example` exists. Never commit a filled-in `.env` — `.gitignore` excludes
 `.env` and `.env.*` and lets the template through.
 
-**The `.env` step is a deliberate divergence from market-agent's copy.**
-`SettingsConfigDict(env_file=".env")` loads that file into the `Settings` class
-only and never into `os.environ`, so every secret written to `.env` was silently
-ignored and fell through to Key Vault — while every document in both repositories
-claimed otherwise. `settings.py` therefore imports `python-dotenv` directly, and
-declares it rather than leaning on pydantic-settings' transitive copy. Port the
-fix back; per the copied-modules rule below, the same bug fixed twice is the
-tripwire for extracting a library.
+**The `.env` step is explicit.** `SettingsConfigDict(env_file=".env")` loads
+that file into the `Settings` class only and never into `os.environ`, so every
+secret written to `.env` was once silently ignored and fell through to Key
+Vault. The resolution now comes from jay-withers/appkit (`appkit.keyvault`, the
+`azure` extra, which brings `python-dotenv`), which reads `.env` itself, and
+market-agent uses the same code.
 
 Setting `KEY_VAULT_URI` in a local `.env` is a supported way to work: the secrets
 then resolve from the real vault through your own `az login`, and no private key
@@ -276,8 +274,12 @@ config change.
 
 ## Copied modules
 
-`fetch.py`, `mailer.py`, `telemetry.py`, `settings.py` and `cli.py` are copied
-from market-agent, each with a header naming the source file and commit.
+`fetch.py`, `mailer.py`, `telemetry.py` and `cli.py` are copied from
+market-agent, each with a header naming the source file and commit.
+`settings.py`'s secret resolution is no longer a copy: the tripwire below fired
+(the `.env` bug, then three more web apps), and it comes from
+[jay-withers/appkit](https://github.com/jay-withers/appkit) as `appkit[azure]`,
+pinned in `[tool.uv.sources]` so Renovate bumps it. `Settings` stays here.
 **Re-copy rather than diverge** — the same culture as
 `scripts/check-tf-standards.sh`, which is shared verbatim across five repos.
 
