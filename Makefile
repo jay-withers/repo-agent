@@ -75,6 +75,13 @@ deployed-tag: ## Print the image tag live on the job
 		--query 'properties.template.containers[0].image' -o tsv \
 		| sed -n 's|^$(IMAGE_REGISTRY)/repoagent:||p'
 
+# The smoke test is jay-withers/workflows' scripts/smoke.sh, fetched at the
+# commit cd-publish pins container-apps-deploy.yml to: one copy for every app
+# repo, the same version in CI and in a local run, and Renovate's bump of that
+# pin moves it.
+WORKFLOWS_SHA = $(shell sed -n 's|.*container-apps-deploy\.yml@\([0-9a-f]\{40\}\).*|\1|p' .github/workflows/cd-publish.yml | head -n 1)
+SMOKE_SH_URL = https://raw.githubusercontent.com/jay-withers/workflows/$(WORKFLOWS_SHA)/scripts/smoke.sh
+
 # Run by cd-publish after every deploy (and by hand after a local one). A
 # failure there rolls back to `make deployed-tag`'s answer. Each job also gets
 # one `selfcheck` run, which does nothing a real run would (no scan, no email).
@@ -82,7 +89,10 @@ smoke: ## Check IMAGE_TAG is set on the scan job, and selfcheck it (IMAGE_TAG re
 	@if [ -z "$(IMAGE_TAG_EXPLICIT)" ]; then \
 		echo "error: pass the tag to check, e.g. make smoke IMAGE_TAG=v0.1.0" >&2; exit 1; fi
 	@terraform -chdir=$(TF_DIR) init -reconfigure -backend-config=backends/$(ENV).hcl >/dev/null
-	scripts/smoke.sh $(IMAGE_TAG) \
+	@[ -n "$(WORKFLOWS_SHA)" ] || { echo "smoke: no container-apps-deploy.yml@<sha> pin in .github/workflows/cd-publish.yml" >&2; exit 1; }
+	@script="$$(mktemp)"; trap 'rm -f "$$script"' EXIT; \
+	curl -fsSL --retry 3 -o "$$script" "$(SMOKE_SH_URL)" || { echo "smoke: can't fetch $(SMOKE_SH_URL)" >&2; exit 1; }; \
+	bash "$$script" $(IMAGE_TAG) \
 		"$$(terraform -chdir=$(TF_DIR) output -raw resource_group_name)" \
 		$(IMAGE_REGISTRY)/repoagent \
 		job:"$$(terraform -chdir=$(TF_DIR) output -raw scan_job_name)"

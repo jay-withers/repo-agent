@@ -277,7 +277,8 @@ rollback.
 
 **Every deploy is checked, and a failed one rolls back.** Before deploying,
 the workflow records `make deployed-tag` (the tag on the job now). After it,
-`make smoke` (`scripts/smoke.sh`) checks that the scan job is configured with the new
+`make smoke` (jay-withers/workflows' `scripts/smoke.sh`, fetched at the commit
+cd-publish pins) checks that the scan job is configured with the new
 tag, then starts one run of each with its args swapped for `repoagent selfcheck`,
 which checks the settings, secrets and storage a real run needs and does
 nothing else, and waits for it to succeed. If the deploy or the check fails, the workflow redeploys the recorded tag and fails the run, so a

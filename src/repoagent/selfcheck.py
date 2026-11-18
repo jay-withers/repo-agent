@@ -1,6 +1,6 @@
 """`repoagent selfcheck`: prove a job's container could do a real run, and do nothing.
 
-After every deploy, `make smoke` (scripts/smoke.sh) starts one run of each job
+After every deploy, `make smoke` (workflows' smoke.sh) starts one run of each job
 with its args swapped for `selfcheck`. That run gets everything a real one does
 — the image, the managed identity, the env and the Key Vault references — and
 checks what a real run needs before it does anything: the settings load, every
