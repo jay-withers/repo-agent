@@ -172,8 +172,8 @@ GraphQL. `fetch.py` retries 403 for the same reason.
 
 ## Local development
 
-`settings.py` reads every secret from the environment first and only then from
-Key Vault, which is what makes this work with no Azure at all:
+`settings.py` reads every secret from the environment first, then `.env`, and
+only then from Key Vault (through jay-withers/appkit's `keyvault`), which is what makes this work with no Azure at all:
 
 ```bash
 make install

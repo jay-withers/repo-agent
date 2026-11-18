@@ -102,9 +102,11 @@ make state     # print what the scan remembers between runs
 
 ### Shared code ([copied modules](docs/design.md#copied-modules), [Terraform](docs/design.md#terraform-conventions), [Docker](docs/design.md#docker))
 
-- `fetch.py`, `mailer.py`, `telemetry.py`, `settings.py` and `cli.py` are
-  copied from market-agent. **Re-copy, don't diverge.** If a third consumer
-  appears, or the same bug is fixed twice, extract a library.
+- `fetch.py`, `mailer.py`, `telemetry.py` and `cli.py` are copied from
+  market-agent. **Re-copy, don't diverge.** Secret resolution comes from
+  jay-withers/appkit (`appkit[azure]`): fix a bug there, with its test, and
+  let Renovate raise the bump. `settings.py` keeps `Settings` and the cached
+  wrappers the tests clear.
 - `scripts/check-tf-standards.sh` is shared verbatim with four repos. The lock
   file carries hashes for linux_amd64, linux_arm64 and darwin_arm64.
 - The image runs as uid **10001**, numerically. Both `uv sync` calls use
