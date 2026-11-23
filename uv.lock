@@ -31,7 +31,7 @@ wheels = [
 [[package]]
 name = "appkit"
 version = "0.0.0"
-source = { git = "https://github.com/jay-withers/appkit?tag=v0.2.0#582f18298f88b431aee98a7e5a3482cdc11c016e" }
+source = { git = "https://github.com/jay-withers/appkit?tag=v0.8.1#eca2a035e4ae98e057e386a6135b9764e756e2e3" }
 
 [package.optional-dependencies]
 azure = [
@@ -1338,7 +1338,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "appkit", extras = ["azure"], git = "https://github.com/jay-withers/appkit?tag=v0.2.0" },
+    { name = "appkit", extras = ["azure"], git = "https://github.com/jay-withers/appkit?tag=v0.8.1" },
     { name = "azure-monitor-opentelemetry", specifier = ">=1.6" },
     { name = "azure-storage-blob", specifier = ">=12.23" },
     { name = "httpx", specifier = ">=0.28" },
