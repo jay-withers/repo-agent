@@ -351,9 +351,9 @@ Required checks (set in github-repos): `pre-commit / Pre-commit`,
 `container-build`.
 
 - **ci-pre-commit**: every hook.
-- **ci-python** (`test / Test`): pytest, mypy over `src/` and `tests/`, and
-  diff coverage — at least 80% of the lines a PR changes in `repoagent` must
-  be run by a test.
+- **ci-python** (`test / Test`): pytest, mypy over `src/` and `tests/`, ruff,
+  and two coverage floors — total coverage of `repoagent`, and the lines a PR
+  changes, must each be at least 90%.
 - **ci-codeql**: CodeQL code scanning of the workflows.
 - **cd-tag** → **cd-publish**: a release on every merge; when app files
   changed, the image is published and deployed (see [Deploying](#deploying)).

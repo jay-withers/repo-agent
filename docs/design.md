@@ -339,11 +339,12 @@ Renovate auto-merge a Python 3.15 base image that could not build.
 - `python-version` matches the Dockerfile's base, and the reusable workflow runs
   `uv run --locked`, so a `pyproject.toml` edited without its lockfile fails in
   CI rather than on someone's machine.
-- **Coverage is reported, never gated.** `pytest-cov` is injected by the
-  workflow with `uv run --with`, an ephemeral overlay that needs no dependency
-  here and does not invalidate `--locked`. The caller grants
-  `pull-requests: write` for the comment — a called workflow can never hold
-  more than its caller.
+- **Coverage is gated at 90%, total and diff.** `coverage-min` and
+  `diff-coverage` fail `test / Test` under 90%; the table is in the job
+  summary, with no PR comment, so the caller grants no `pull-requests: write`.
+  `pytest-cov` is injected by the workflow with `uv run --with`, an ephemeral
+  overlay that needs no dependency here and does not invalidate `--locked`.
+  `lint: true` runs `ruff check` and `ruff format --check` there too.
 - `ci-terraform` calls two shared workflows, the same split
   azure-container-apps uses: `validate` comes from `terraform.yml` and reports
   `terraform / Terraform`, and `plan` calls `terraform-deploy.yml` for dev,

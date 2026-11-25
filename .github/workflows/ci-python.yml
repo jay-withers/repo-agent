@@ -1,6 +1,6 @@
 name: ci-python
 
-# Runs the test suite, mypy and the diff-coverage gate on a pull request.
+# Runs the test suite, mypy, ruff and both coverage floors on a pull request.
 #
 # The mechanics live in jay-withers/workflows, so every repo of ours gets the
 # same job and a fix lands once. Only what is specific to this repo is here.
@@ -15,10 +15,6 @@ on:
 
 permissions:
   contents: read
-  # For the coverage comment below. The reusable workflow declares no
-  # permissions of its own precisely so this is reachable — a called workflow
-  # can never hold more than its caller grants.
-  pull-requests: write
 
 jobs:
   test:
@@ -33,23 +29,24 @@ jobs:
     #
     # Deliberately not path filtered: a required check skipped by a path filter
     # never reports, which blocks a pull request rather than passing it.
-    uses: jay-withers/workflows/.github/workflows/python.yml@f748462468ce1fc5b385413fba07e41afc28c1db # v1.32.2
+    uses: jay-withers/workflows/.github/workflows/python.yml@93bff29fb7e15a3669a1f120ab0c3a2940a413d6 # v1.34.0
     with:
       # The package is at the repository root; there is one deliverable and no
       # apps/ nesting to point at.
       working-directory: .
       python-version: "3.14"
       extras: dev
-      # Reported, never gated. The checks are pure functions and should sit
-      # near 100%; everything behind an HTTP call is covered through
-      # MockTransport. A threshold would mostly measure how much of the Azure
-      # SDK path is mocked, which asserts the mock rather than the behaviour.
       coverage: repoagent
-      coverage-pr-comment: true
-      # The total above is never gated; diff-coverage gates only the lines a PR
-      # changes, where the cheap way to pass is to test the new code. A test that
-      # only asserts a mock still counts, so review the tests too.
-      diff-coverage: "80"
+      # Both floors fail the check: the total (coverage-min), so the package
+      # can't slip, and the lines a PR changes (diff-coverage), so new code
+      # comes with its tests. A test that only asserts a mock still counts,
+      # so review the tests too. The table is in the job summary; there is
+      # no PR comment.
+      coverage-min: "90"
+      diff-coverage: "90"
       typecheck: mypy
+      # ruff check and ruff format --check, from the locked dev extra, so CI
+      # runs the ruff `make lint` does.
+      lint: true
       # No `postgres` input: this project has no database. That is the whole
       # reason the shared platform carries none.
