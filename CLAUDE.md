@@ -153,12 +153,13 @@ diverged, so anything specific to this project's models belongs in factories.
 off unless a test switches it on. A test that enabled it accidentally would
 reach `api.deepseek.com` for real.
 
-CI gates two more things, both inside `test / Test`: mypy over
-`src/` and `tests/` (`[tool.mypy]` in `pyproject.toml`, so `make typecheck` runs
-the same check) and diff coverage. At least 80%
-of the lines a PR changes in `repoagent` must be run by a test. Total coverage is
-reported, never gated. Don't meet the diff gate with a test that only asserts
-a mock; test the behaviour.
+CI gates three more things, all inside `test / Test`: mypy over `src/` and
+`tests/` (`[tool.mypy]` in `pyproject.toml`, so `make typecheck` runs the same
+check), ruff (`ruff check` and `ruff format --check`, the same ruff `make lint`
+runs) and coverage. Total coverage of `repoagent` must be at least 90%, and so
+must the lines a PR changes; the table is in the job summary, not a PR comment.
+Don't meet either floor with a test that only asserts a mock; test the
+behaviour.
 
 ## Commit messages
 
