@@ -24,8 +24,10 @@ jobs:
     # pytest" after a successful-looking install — and only in CI, because
     # locally `make install` has already put it in the venv.
     #
-    # python-version matches the python:3.14 base in the Dockerfile, so a pass
-    # here is a pass on the interpreter Container Apps runs.
+    # The interpreter is mise.toml's python (python.yml reads it from mise;
+    # python-version only applies without mise), and ci-container-build
+    # checks it is the image's, so a pass here is a pass on the interpreter
+    # that ships.
     #
     # Deliberately not path filtered: a required check skipped by a path filter
     # never reports, which blocks a pull request rather than passing it.
@@ -34,7 +36,6 @@ jobs:
       # The package is at the repository root; there is one deliverable and no
       # apps/ nesting to point at.
       working-directory: .
-      python-version: "3.14"
       extras: dev
       coverage: repoagent
       # Both floors fail the check: the total (coverage-min), so the package
