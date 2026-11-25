@@ -51,6 +51,7 @@ jobs:
               - 'Dockerfile'
               - 'pyproject.toml'
               - 'uv.lock'
+              - 'mise.toml'
               - '.github/workflows/ci-container-build.yml'
 
   # push is left at its default of false: a pull request must never publish an
@@ -67,10 +68,10 @@ jobs:
       contents: read
       security-events: write # Trivy findings to code scanning
       issues: write # build-failed issue, outside pull requests
-    uses: jay-withers/workflows/.github/workflows/docker.yml@f748462468ce1fc5b385413fba07e41afc28c1db # v1.32.2
+    uses: jay-withers/workflows/.github/workflows/docker.yml@ca86e90ed1f90f0afae1c2f2fc5a20c3a2115287 # v1.35.0
     with:
       images: |
-        [{"name": "repoagent", "context": "."}]
+        [{"name": "repoagent", "context": ".", "python": "python"}]
       failure-issue: ${{ github.event_name != 'pull_request' }}
 
   # The required status check ("container-build"). Skipped counts as success,

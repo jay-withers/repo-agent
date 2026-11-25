@@ -116,7 +116,7 @@ make state     # print what the scan remembers between runs
 
 Thin callers of `jay-withers/workflows`, pinned by SHA. The required checks
 (set in github-repos) are `pre-commit / Pre-commit`, `test / Test`,
-`terraform / Terraform`, `terraform-plan` and `container-build`. ci-python
+`terraform / Terraform`, `terraform-plan` and `container-build`. `ci-container-build` also checks the image's Python is the one `mise.toml` pins, which local runs and CI test on (workflows v1.35.0+, the image's `"python"` field); `mise.toml` is in its path filter, so a Python bump runs it. ci-python
 needs `extras: dev`. `cd-terraform` plans on merge and applies only when run
 by hand. `cd-tag` → `cd-publish` deploys when app files changed.
 
