@@ -1,0 +1,21 @@
+Scanned 2 repositories.
+
+3 finding(s), 3 new since last run:
+
+  [high] jay-withers/solo: no Renovate configuration [NEW]
+      No renovate.json, renovate.json5 or .renovaterc at any path Renovate reads, so dependencies here are never updated automatically.
+      https://github.com/jay-withers/solo
+  [medium] jay-withers/solo: no README [NEW]
+      Nothing at README.md, so the repository's front page is a file listing.
+      https://github.com/jay-withers/solo
+  [low] jay-withers/solo: no CI workflows [NEW]
+      No .github/workflows/*.yml. Nothing runs on push or pull request.
+      https://github.com/jay-withers/solo
+
+Ignored by topic: jay-withers/skip (no-scan)
+
+Repositories:
+  jay-withers/other  [archived]
+  jay-withers/solo
+
+repo-agent unknown

@@ -13,3 +13,7 @@ terraform = "1.17.2"
 tflint = "0.66.0"
 terraform-docs = "0.25.1"
 checkov = "3.4.5"
+# The Go port (cmd/, internal/): workflows' go.yml takes Go from here with
+# GOTOOLCHAIN=local, and runs this golangci-lint.
+go = "1.27.4"
+golangci-lint = "2.15.0"

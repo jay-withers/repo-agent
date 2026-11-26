@@ -170,6 +170,34 @@ search calls per repository across eleven repositories tripped it within seconds
 during design. Everything needed is available from the core REST API and from
 GraphQL. `fetch.py` retries 403 for the same reason.
 
+## The Go port
+
+repo-agent is being ported to Go, in place. The Go version lives in `cmd/`
+and `internal/`, beside the Python version it will replace. Until the cutover,
+the Python image is still the one built and deployed. The Go version's goal is
+no visible change: the same digest, the same finding ids, the same state blob
+and the same CLI, image name and `ENTRYPOINT`.
+
+The proof is a parity test. `testdata/golden/*/fixture.json` describe what
+GitHub, DeepSeek and the state blob answer, and between them they fire every
+check. `make golden` runs the Python scan on each fixture with the clock
+frozen, and saves what came out: the digest's subject, text and HTML, the
+DeepSeek prompt, the GraphQL query and the saved state document. The Go suite
+then runs the Go scan on the same fixtures and fails unless every one of those
+outputs is byte for byte the same.
+
+```bash
+make go-test    # gofmt, vet, golangci-lint, go test -race (the parity test included)
+make go-render  # the Go `render`: compare with `make run` on the same day
+make golden     # regenerate testdata/golden from the Python, after changing a fixture
+```
+
+`make test` runs both suites. The cutover, in a later PR, does the following:
+
+- switches the Dockerfile to a distroless Go build;
+- moves `test / Test` to the Go suite;
+- deletes the Python.
+
 ## Local development
 
 `settings.py` reads every secret from the environment first, then `.env`, and
@@ -354,6 +382,10 @@ Required checks (set in github-repos): `pre-commit / Pre-commit`,
 - **ci-python** (`test / Test`): pytest, mypy over `src/` and `tests/`, ruff,
   and two coverage floors — total coverage of `repoagent`, and the lines a PR
   changes, must each be at least 90%.
+- **ci-go** (`go / Test`, not required yet): the Go port's checks through
+  workflows' `go.yml`: gofmt, vet, golangci-lint, `go mod tidy -diff`, the
+  race-enabled suite with the parity test, and the same two 90% coverage
+  floors. At the cutover its job becomes `test`, and ci-python goes.
 - **ci-codeql**: CodeQL code scanning of the workflows.
 - **cd-tag** → **cd-publish**: a release on every merge; when app files
   changed, the image is published and deployed (see [Deploying](#deploying)).

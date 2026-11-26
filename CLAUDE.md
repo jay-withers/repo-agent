@@ -13,6 +13,9 @@ each. The reasoning behind them, and the incidents that made them, are in
 [docs/design.md](docs/design.md) and [docs/checks.md](docs/checks.md): read the
 linked section before changing the thing a rule protects.
 
+**A Go port is in progress beside it** (`cmd/`, `internal/`; see "The Go
+port" below). The Python still ships.
+
 **Status: working.** It authenticates, lists every repository, fetches detail
 for each with one batched GraphQL query, runs deterministic checks, asks
 DeepSeek to triage the results, and emails a digest.
@@ -27,6 +30,8 @@ make run       # repoagent render: scans real GitHub, prints the digest, sends n
 make validate  # terraform init -backend=false + validate
 make deploy IMAGE_TAG=vX.Y.Z
 make state     # print what the scan remembers between runs
+make go-test   # the Go port: gofmt, vet, golangci-lint, go test -race
+make golden    # regenerate testdata/golden from the Python scan
 ```
 
 `make` with no target lists the rest.
@@ -41,6 +46,19 @@ make state     # print what the scan remembers between runs
   never saves.
 - `repoagent suppress` requires `--reason`. An unparseable expiry *expires*.
   The operator commands report failure; the scan never does.
+
+### The Go port ([Go port](docs/design.md#the-go-port))
+
+- `cmd/` and `internal/` are a Go port **beside** the Python, which still
+  ships. It must change nothing visible: digest, `Finding.id`, state JSON,
+  prompt, query, CLI.
+- **Parity is the golden test.** A change to the Python's output changes the
+  Go in the same PR: edit the fixture if needed, `make golden`, then
+  `make go-test`. Never hand-edit a golden file.
+- Python formatting goes through `internal/pyfmt` (`repr`, `{:,}`,
+  `splitlines`, `html.escape`, `json.dumps`), never Go's look-alikes.
+- Logs keep Python's line format, not JSON: obsview groups errors by
+  masking quoted values.
 
 ### Infrastructure ([two-repo split](docs/design.md#the-two-repo-split), [`command`](docs/design.md#the-command-decision--do-not-undo-this), [deploy](docs/design.md#make-deploy-is-az-cli-not-terraform-apply))
 
@@ -117,12 +135,20 @@ make state     # print what the scan remembers between runs
 Thin callers of `jay-withers/workflows`, pinned by SHA. The required checks
 (set in github-repos) are `pre-commit / Pre-commit`, `test / Test`,
 `terraform / Terraform`, `terraform-plan` and `container-build`. `ci-container-build` also checks the image's Python is the one `mise.toml` pins, which local runs and CI test on (workflows v1.35.0+, the image's `"python"` field); `mise.toml` is in its path filter, so a Python bump runs it. ci-python
-needs `extras: dev`. `cd-terraform` plans on merge and applies only when run
+needs `extras: dev`. `ci-go` runs the Go port as `go / Test`, which nothing
+requires until the cutover renames its job to `test`. `cd-terraform` plans on merge and applies only when run
 by hand. `cd-tag` → `cd-publish` deploys when app files changed.
 
 ## Testing
 
-`make test`. Tests never touch the network or Azure. `tests/conftest.py`:
+`make test` runs the Go suite (`make go-test`), then pytest. Tests never
+touch the network or Azure. The Go tests follow the same rules as the Python:
+`t.Chdir` into an empty directory, `KEY_VAULT_URI` set empty,
+`settings.Reset()` and `github.ResetCache()` around each test, an RSA key
+generated in process, HTTP faked with a `RoundTripper` and the clock frozen
+through `model.Now`.
+
+The Python's `tests/conftest.py`:
 
 - **`chdir`s into an empty `tmp_path`**, so a developer's own `.env` cannot reach
   the suite. Both `Settings` and `secret()` resolve `.env` relative to the

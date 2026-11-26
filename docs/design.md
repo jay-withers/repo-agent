@@ -336,9 +336,14 @@ Renovate auto-merge a Python 3.15 base image that could not build.
   *extra*, not a dependency group, and `uv run` installs groups but not extras
   — without it the job fails with a bare `Failed to spawn: pytest` after a
   successful-looking install.
-- `python-version` matches the Dockerfile's base, and the reusable workflow runs
-  `uv run --locked`, so a `pyproject.toml` edited without its lockfile fails in
-  CI rather than on someone's machine.
+- The interpreter is `mise.toml`'s `python`, and `ci-container-build` checks it
+  is the image's. The reusable workflow runs `uv run --locked`, so a
+  `pyproject.toml` edited without its lockfile fails in CI rather than on
+  someone's machine.
+- **ci-go runs the Go port** through workflows' `go.yml`, as job `go`. Its
+  context is `go / Test`, which nothing requires yet. The cutover renames the
+  job to `test` and deletes ci-python, so `test / Test` moves to Go with no
+  change in github-repos. See [The Go port](#the-go-port).
 - **Coverage is gated at 90%, total and diff.** `coverage-min` and
   `diff-coverage` fail `test / Test` under 90%; the table is in the job
   summary, with no PR comment, so the caller grants no `pull-requests: write`.
@@ -374,6 +379,86 @@ Renovate auto-merge a Python 3.15 base image that could not build.
   and neither tag is ever moved; Container Apps creates a revision only when
   the template changes, so a re-pushed moving tag would deploy nothing and
   report success.
+
+## The Go port
+
+repo-agent is being ported to Go, mostly as a learning exercise. It suited Go
+best of the estate's apps: a weekly job with no web UI, made of REST and
+GraphQL calls, a signed JWT, pure checks and one JSON blob. The port happens in
+place, in `cmd/repoagent` and `internal/`, beside the Python, and the Python
+image stays the shipped one until a separate cutover PR.
+
+**The goal is no visible change.** These all stay the same:
+
+- the digest's text and HTML;
+- `Finding.id` (`sha256("repo:check")[:12]`);
+- the state blob's JSON, so suppressions and first-seen dates survive the
+  cutover;
+- the CLI, the image name and the `ENTRYPOINT`;
+- the DeepSeek prompt, byte for byte;
+- the GraphQL query.
+
+The decisions behind it:
+
+- **Parity is proven, not argued.** `testdata/golden/<scenario>/fixture.json`
+  describes the whole outside world: the installation, every REST and GraphQL
+  answer, DeepSeek's reply, the prior state and the clock. Between them, the
+  fixtures fire every check, and cover:
+
+  - the tri-states;
+  - repr-quoted PR titles;
+  - truncation;
+  - suppressions that are active, expired, unparseable and orphaned;
+  - invented finding ids and suggestions;
+  - a failed detail query.
+
+  `scripts/golden.py` (`make golden`) runs the real Python scan on each
+  fixture and writes what came out: subject, text, HTML, prompt, system
+  prompt, detail query and saved state. `internal/scan/golden_test.go` runs
+  the Go scan on the same fixture and compares every file byte for byte. A
+  fixture change is regenerated from the Python, never hand-edited into a
+  golden file. The golden files outlive the Python as the Go suite's
+  fixtures.
+- **`internal/pyfmt` reproduces Python's formatting** wherever the Python's
+  output depends on it:
+
+  - `repr()` for quoted titles, including its choice of quote;
+  - `{:,}`;
+  - `str.splitlines()`, which splits on more than `\n`;
+  - character, not byte, truncation;
+  - `html.escape` (`&#x27;`, not Go's `&#39;`);
+  - `json.dumps` with `ensure_ascii` in both the indented (state) and compact
+    (prompt) forms;
+  - `isoformat()`.
+
+  Each rule is tested against strings CPython printed.
+- **Logs keep Python's line format** (`2026-11-29 18:00:01,123 WARNING
+  repoagent.fetch …`), through `internal/logging`'s `slog` handler, under
+  the Python modules' logger names, so an error's signature in obsview
+  survives the cutover. They are not JSON: obsview groups error lines by
+  masking quoted values, so every JSON error line would mask to one
+  signature.
+- **Two deliberate differences from the Python**, both where the Python
+  lost data:
+  - A state document with a suppression missing its `reason`, or with
+    `"version": 1.0`, is read. The Python refused the whole document, and
+    the next scan then overwrote it, losing every suppression.
+  - `selfcheck`'s failure line names the check and the error, not the
+    Python's exception class, which Go errors do not have.
+- **No App Insights export.** Go has no Azure Monitor OpenTelemetry distro,
+  and nothing reads repo-agent's traces. The console logs still reach
+  Log Analytics. The cutover drops the connection string from the job's env.
+- **Secret resolution is a port of appkit's `keyvault`** (`internal/settings`):
+  the environment, then `.env`, then Key Vault, with appkit's rule that an
+  empty variable falls through. appkit is Python-only, so it stays here until
+  a second Go app needs it, and then becomes a shared Go module.
+- **The standard library, plus three dependencies**: `golang-jwt` for the App
+  JWT, and the Azure SDK's `azidentity`, `azsecrets` and `azblob`. There is
+  no GitHub client library; the query is the hand-written one.
+- **A Python-only difference was ported faithfully, not fixed**, where a
+  reader could see it. For example, the operator log line
+  `state updated: <id> suppressd` keeps its typo until the Python has gone,
+  so the parity is exact.
 
 ## `make deploy` is az cli, not terraform apply
 

@@ -1,0 +1,32 @@
+name: ci-go
+
+# The Go port (cmd/, internal/), beside the Python while it proves parity.
+#
+# gofmt, go vet, golangci-lint, `go mod tidy -diff`, the race-enabled suite
+# and both coverage floors, all in jay-withers/workflows' go.yml, with Go and
+# golangci-lint from mise.toml (GOTOOLCHAIN=local).
+#
+# The suite includes the parity test: the Go scan replayed against
+# testdata/golden must produce the digest, prompt, query and state document
+# the Python produced from the same fixture (`make golden`).
+#
+# The job id is `go`, not `test`, so its context is `go / Test` and it is not
+# a required check yet: ci-python still reports `test / Test`. The cutover
+# renames this job to `test` and deletes ci-python, and the required check
+# moves to Go with no change in github-repos.
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    uses: jay-withers/workflows/.github/workflows/go.yml@ca86e90ed1f90f0afae1c2f2fc5a20c3a2115287 # v1.35.0
+    with:
+      coverage: true
+      # The same floors as ci-python: the total, and the lines a PR changes.
+      # The table is in the job summary; there is no PR comment.
+      coverage-min: "90"
+      diff-coverage: "90"

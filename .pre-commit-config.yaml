@@ -14,18 +14,23 @@ repos:
       - id: check-yaml
         args: ["--allow-multiple-documents"]
 
+      # Not the golden files: they are the Python's output byte for byte, and
+      # the Go port's parity test compares them exactly, trailing bytes and all.
       - id: end-of-file-fixer
+        exclude: ^testdata/golden/
 
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
+        exclude: ^testdata/golden/
+
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        exclude: ^testdata/golden/
 
       - id: check-shebang-scripts-are-executable
 
       - id: no-commit-to-branch
         args: [--branch, main]
-
-      - id: mixed-line-ending
-        args: [--fix=lf]
 
       - id: forbid-new-submodules
 

@@ -1,0 +1,383 @@
+query RepoDetails($o0: String!, $n0: String!, $o1: String!, $n1: String!, $o2: String!, $n2: String!, $o3: String!, $n3: String!, $o4: String!, $n4: String!) {
+
+  r0: repository(owner: $o0, name: $n0) {
+    nameWithOwner
+    defaultBranchRef { name }
+    renovate0: object(expression: "HEAD:renovate.json") { ... on Blob { text } }
+    renovate1: object(expression: "HEAD:renovate.json5") { ... on Blob { text } }
+    renovate2: object(expression: "HEAD:.github/renovate.json") { ... on Blob { text } }
+    renovate3: object(expression: "HEAD:.github/renovate.json5") { ... on Blob { text } }
+    renovate4: object(expression: "HEAD:.renovaterc") { ... on Blob { text } }
+    renovate5: object(expression: "HEAD:.renovaterc.json") { ... on Blob { text } }
+    readme: object(expression: "HEAD:README.md") { ... on Blob { text } }
+    tflock: object(expression: "HEAD:terraform/.terraform.lock.hcl") { ... on Blob { text } }
+    tflock_root: object(expression: "HEAD:.terraform.lock.hcl") { ... on Blob { text } }
+    dockerfile: object(expression: "HEAD:Dockerfile") { ... on Blob { text } }
+    workflows: object(expression: "HEAD:.github/workflows") {
+      ... on Tree {
+        entries {
+          name
+          # The text, not just the name: whether an action is pinned to a commit
+          # and which runner a job asks for are both answered by the contents and
+          # by nothing else. Workflow files are small; a README is the thing worth
+          # being careful about.
+          object { ... on Blob { text } }
+        }
+      }
+    }
+    pullRequests(states: OPEN, first: 30, orderBy: {field: CREATED_AT, direction: ASC}) {
+      totalCount
+      nodes {
+        number
+        title
+        url
+        isDraft
+        createdAt
+        updatedAt
+        author { login }
+        # For `renovate.blocked_prs`: BLOCKED is a required check failing (or
+        # still running), DIRTY is a conflict. Needs only Pull requests: read,
+        # unlike statusCheckRollup, which wants the Checks permission too.
+        mergeStateStatus
+      }
+    }
+    # Whether Renovate has ever opened a pull request here at all, which is a
+    # different question from whether one is open now — a repository that has
+    # never received a single update looks identical to a fully merged one if
+    # you only count what is open.
+    #
+    # Ordered ASC rather than DESC: Renovate opens its first PR within days of
+    # onboarding, so the *earliest* pull requests are where the evidence is,
+    # and a repository with a long human history would push it off a DESC page.
+    # `totalCount` is what makes the answer honest — where it exceeds the page,
+    # absence proves nothing and `parse` returns None rather than False.
+    # Author is the only field needed; nothing here is ever rendered.
+    closedPullRequests: pullRequests(
+      states: [MERGED, CLOSED], first: 30, orderBy: {field: CREATED_AT, direction: ASC}
+    ) {
+      totalCount
+      nodes { author { login } }
+    }
+    # One page of branches for `hygiene.stale_branches`. Fifty rather than a
+    # hundred because GraphQL scores the *potential* node count — 50 refs, each
+    # with an open-PR count, across a ten-repository batch is comfortably
+    # inside the limit; `totalCount` lets the check say "at least" when it is
+    # not the whole list.
+    branches: refs(refPrefix: "refs/heads/", first: 50) {
+      totalCount
+      nodes {
+        name
+        target { ... on Commit { committedDate } }
+        associatedPullRequests(states: OPEN) { totalCount }
+      }
+    }
+    releases(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) {
+      nodes { tagName publishedAt }
+    }
+  }
+
+  r1: repository(owner: $o1, name: $n1) {
+    nameWithOwner
+    defaultBranchRef { name }
+    renovate0: object(expression: "HEAD:renovate.json") { ... on Blob { text } }
+    renovate1: object(expression: "HEAD:renovate.json5") { ... on Blob { text } }
+    renovate2: object(expression: "HEAD:.github/renovate.json") { ... on Blob { text } }
+    renovate3: object(expression: "HEAD:.github/renovate.json5") { ... on Blob { text } }
+    renovate4: object(expression: "HEAD:.renovaterc") { ... on Blob { text } }
+    renovate5: object(expression: "HEAD:.renovaterc.json") { ... on Blob { text } }
+    readme: object(expression: "HEAD:README.md") { ... on Blob { text } }
+    tflock: object(expression: "HEAD:terraform/.terraform.lock.hcl") { ... on Blob { text } }
+    tflock_root: object(expression: "HEAD:.terraform.lock.hcl") { ... on Blob { text } }
+    dockerfile: object(expression: "HEAD:Dockerfile") { ... on Blob { text } }
+    workflows: object(expression: "HEAD:.github/workflows") {
+      ... on Tree {
+        entries {
+          name
+          # The text, not just the name: whether an action is pinned to a commit
+          # and which runner a job asks for are both answered by the contents and
+          # by nothing else. Workflow files are small; a README is the thing worth
+          # being careful about.
+          object { ... on Blob { text } }
+        }
+      }
+    }
+    pullRequests(states: OPEN, first: 30, orderBy: {field: CREATED_AT, direction: ASC}) {
+      totalCount
+      nodes {
+        number
+        title
+        url
+        isDraft
+        createdAt
+        updatedAt
+        author { login }
+        # For `renovate.blocked_prs`: BLOCKED is a required check failing (or
+        # still running), DIRTY is a conflict. Needs only Pull requests: read,
+        # unlike statusCheckRollup, which wants the Checks permission too.
+        mergeStateStatus
+      }
+    }
+    # Whether Renovate has ever opened a pull request here at all, which is a
+    # different question from whether one is open now — a repository that has
+    # never received a single update looks identical to a fully merged one if
+    # you only count what is open.
+    #
+    # Ordered ASC rather than DESC: Renovate opens its first PR within days of
+    # onboarding, so the *earliest* pull requests are where the evidence is,
+    # and a repository with a long human history would push it off a DESC page.
+    # `totalCount` is what makes the answer honest — where it exceeds the page,
+    # absence proves nothing and `parse` returns None rather than False.
+    # Author is the only field needed; nothing here is ever rendered.
+    closedPullRequests: pullRequests(
+      states: [MERGED, CLOSED], first: 30, orderBy: {field: CREATED_AT, direction: ASC}
+    ) {
+      totalCount
+      nodes { author { login } }
+    }
+    # One page of branches for `hygiene.stale_branches`. Fifty rather than a
+    # hundred because GraphQL scores the *potential* node count — 50 refs, each
+    # with an open-PR count, across a ten-repository batch is comfortably
+    # inside the limit; `totalCount` lets the check say "at least" when it is
+    # not the whole list.
+    branches: refs(refPrefix: "refs/heads/", first: 50) {
+      totalCount
+      nodes {
+        name
+        target { ... on Commit { committedDate } }
+        associatedPullRequests(states: OPEN) { totalCount }
+      }
+    }
+    releases(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) {
+      nodes { tagName publishedAt }
+    }
+  }
+
+  r2: repository(owner: $o2, name: $n2) {
+    nameWithOwner
+    defaultBranchRef { name }
+    renovate0: object(expression: "HEAD:renovate.json") { ... on Blob { text } }
+    renovate1: object(expression: "HEAD:renovate.json5") { ... on Blob { text } }
+    renovate2: object(expression: "HEAD:.github/renovate.json") { ... on Blob { text } }
+    renovate3: object(expression: "HEAD:.github/renovate.json5") { ... on Blob { text } }
+    renovate4: object(expression: "HEAD:.renovaterc") { ... on Blob { text } }
+    renovate5: object(expression: "HEAD:.renovaterc.json") { ... on Blob { text } }
+    readme: object(expression: "HEAD:README.md") { ... on Blob { text } }
+    tflock: object(expression: "HEAD:terraform/.terraform.lock.hcl") { ... on Blob { text } }
+    tflock_root: object(expression: "HEAD:.terraform.lock.hcl") { ... on Blob { text } }
+    dockerfile: object(expression: "HEAD:Dockerfile") { ... on Blob { text } }
+    workflows: object(expression: "HEAD:.github/workflows") {
+      ... on Tree {
+        entries {
+          name
+          # The text, not just the name: whether an action is pinned to a commit
+          # and which runner a job asks for are both answered by the contents and
+          # by nothing else. Workflow files are small; a README is the thing worth
+          # being careful about.
+          object { ... on Blob { text } }
+        }
+      }
+    }
+    pullRequests(states: OPEN, first: 30, orderBy: {field: CREATED_AT, direction: ASC}) {
+      totalCount
+      nodes {
+        number
+        title
+        url
+        isDraft
+        createdAt
+        updatedAt
+        author { login }
+        # For `renovate.blocked_prs`: BLOCKED is a required check failing (or
+        # still running), DIRTY is a conflict. Needs only Pull requests: read,
+        # unlike statusCheckRollup, which wants the Checks permission too.
+        mergeStateStatus
+      }
+    }
+    # Whether Renovate has ever opened a pull request here at all, which is a
+    # different question from whether one is open now — a repository that has
+    # never received a single update looks identical to a fully merged one if
+    # you only count what is open.
+    #
+    # Ordered ASC rather than DESC: Renovate opens its first PR within days of
+    # onboarding, so the *earliest* pull requests are where the evidence is,
+    # and a repository with a long human history would push it off a DESC page.
+    # `totalCount` is what makes the answer honest — where it exceeds the page,
+    # absence proves nothing and `parse` returns None rather than False.
+    # Author is the only field needed; nothing here is ever rendered.
+    closedPullRequests: pullRequests(
+      states: [MERGED, CLOSED], first: 30, orderBy: {field: CREATED_AT, direction: ASC}
+    ) {
+      totalCount
+      nodes { author { login } }
+    }
+    # One page of branches for `hygiene.stale_branches`. Fifty rather than a
+    # hundred because GraphQL scores the *potential* node count — 50 refs, each
+    # with an open-PR count, across a ten-repository batch is comfortably
+    # inside the limit; `totalCount` lets the check say "at least" when it is
+    # not the whole list.
+    branches: refs(refPrefix: "refs/heads/", first: 50) {
+      totalCount
+      nodes {
+        name
+        target { ... on Commit { committedDate } }
+        associatedPullRequests(states: OPEN) { totalCount }
+      }
+    }
+    releases(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) {
+      nodes { tagName publishedAt }
+    }
+  }
+
+  r3: repository(owner: $o3, name: $n3) {
+    nameWithOwner
+    defaultBranchRef { name }
+    renovate0: object(expression: "HEAD:renovate.json") { ... on Blob { text } }
+    renovate1: object(expression: "HEAD:renovate.json5") { ... on Blob { text } }
+    renovate2: object(expression: "HEAD:.github/renovate.json") { ... on Blob { text } }
+    renovate3: object(expression: "HEAD:.github/renovate.json5") { ... on Blob { text } }
+    renovate4: object(expression: "HEAD:.renovaterc") { ... on Blob { text } }
+    renovate5: object(expression: "HEAD:.renovaterc.json") { ... on Blob { text } }
+    readme: object(expression: "HEAD:README.md") { ... on Blob { text } }
+    tflock: object(expression: "HEAD:terraform/.terraform.lock.hcl") { ... on Blob { text } }
+    tflock_root: object(expression: "HEAD:.terraform.lock.hcl") { ... on Blob { text } }
+    dockerfile: object(expression: "HEAD:Dockerfile") { ... on Blob { text } }
+    workflows: object(expression: "HEAD:.github/workflows") {
+      ... on Tree {
+        entries {
+          name
+          # The text, not just the name: whether an action is pinned to a commit
+          # and which runner a job asks for are both answered by the contents and
+          # by nothing else. Workflow files are small; a README is the thing worth
+          # being careful about.
+          object { ... on Blob { text } }
+        }
+      }
+    }
+    pullRequests(states: OPEN, first: 30, orderBy: {field: CREATED_AT, direction: ASC}) {
+      totalCount
+      nodes {
+        number
+        title
+        url
+        isDraft
+        createdAt
+        updatedAt
+        author { login }
+        # For `renovate.blocked_prs`: BLOCKED is a required check failing (or
+        # still running), DIRTY is a conflict. Needs only Pull requests: read,
+        # unlike statusCheckRollup, which wants the Checks permission too.
+        mergeStateStatus
+      }
+    }
+    # Whether Renovate has ever opened a pull request here at all, which is a
+    # different question from whether one is open now — a repository that has
+    # never received a single update looks identical to a fully merged one if
+    # you only count what is open.
+    #
+    # Ordered ASC rather than DESC: Renovate opens its first PR within days of
+    # onboarding, so the *earliest* pull requests are where the evidence is,
+    # and a repository with a long human history would push it off a DESC page.
+    # `totalCount` is what makes the answer honest — where it exceeds the page,
+    # absence proves nothing and `parse` returns None rather than False.
+    # Author is the only field needed; nothing here is ever rendered.
+    closedPullRequests: pullRequests(
+      states: [MERGED, CLOSED], first: 30, orderBy: {field: CREATED_AT, direction: ASC}
+    ) {
+      totalCount
+      nodes { author { login } }
+    }
+    # One page of branches for `hygiene.stale_branches`. Fifty rather than a
+    # hundred because GraphQL scores the *potential* node count — 50 refs, each
+    # with an open-PR count, across a ten-repository batch is comfortably
+    # inside the limit; `totalCount` lets the check say "at least" when it is
+    # not the whole list.
+    branches: refs(refPrefix: "refs/heads/", first: 50) {
+      totalCount
+      nodes {
+        name
+        target { ... on Commit { committedDate } }
+        associatedPullRequests(states: OPEN) { totalCount }
+      }
+    }
+    releases(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) {
+      nodes { tagName publishedAt }
+    }
+  }
+
+  r4: repository(owner: $o4, name: $n4) {
+    nameWithOwner
+    defaultBranchRef { name }
+    renovate0: object(expression: "HEAD:renovate.json") { ... on Blob { text } }
+    renovate1: object(expression: "HEAD:renovate.json5") { ... on Blob { text } }
+    renovate2: object(expression: "HEAD:.github/renovate.json") { ... on Blob { text } }
+    renovate3: object(expression: "HEAD:.github/renovate.json5") { ... on Blob { text } }
+    renovate4: object(expression: "HEAD:.renovaterc") { ... on Blob { text } }
+    renovate5: object(expression: "HEAD:.renovaterc.json") { ... on Blob { text } }
+    readme: object(expression: "HEAD:README.md") { ... on Blob { text } }
+    tflock: object(expression: "HEAD:terraform/.terraform.lock.hcl") { ... on Blob { text } }
+    tflock_root: object(expression: "HEAD:.terraform.lock.hcl") { ... on Blob { text } }
+    dockerfile: object(expression: "HEAD:Dockerfile") { ... on Blob { text } }
+    workflows: object(expression: "HEAD:.github/workflows") {
+      ... on Tree {
+        entries {
+          name
+          # The text, not just the name: whether an action is pinned to a commit
+          # and which runner a job asks for are both answered by the contents and
+          # by nothing else. Workflow files are small; a README is the thing worth
+          # being careful about.
+          object { ... on Blob { text } }
+        }
+      }
+    }
+    pullRequests(states: OPEN, first: 30, orderBy: {field: CREATED_AT, direction: ASC}) {
+      totalCount
+      nodes {
+        number
+        title
+        url
+        isDraft
+        createdAt
+        updatedAt
+        author { login }
+        # For `renovate.blocked_prs`: BLOCKED is a required check failing (or
+        # still running), DIRTY is a conflict. Needs only Pull requests: read,
+        # unlike statusCheckRollup, which wants the Checks permission too.
+        mergeStateStatus
+      }
+    }
+    # Whether Renovate has ever opened a pull request here at all, which is a
+    # different question from whether one is open now — a repository that has
+    # never received a single update looks identical to a fully merged one if
+    # you only count what is open.
+    #
+    # Ordered ASC rather than DESC: Renovate opens its first PR within days of
+    # onboarding, so the *earliest* pull requests are where the evidence is,
+    # and a repository with a long human history would push it off a DESC page.
+    # `totalCount` is what makes the answer honest — where it exceeds the page,
+    # absence proves nothing and `parse` returns None rather than False.
+    # Author is the only field needed; nothing here is ever rendered.
+    closedPullRequests: pullRequests(
+      states: [MERGED, CLOSED], first: 30, orderBy: {field: CREATED_AT, direction: ASC}
+    ) {
+      totalCount
+      nodes { author { login } }
+    }
+    # One page of branches for `hygiene.stale_branches`. Fifty rather than a
+    # hundred because GraphQL scores the *potential* node count — 50 refs, each
+    # with an open-PR count, across a ten-repository batch is comfortably
+    # inside the limit; `totalCount` lets the check say "at least" when it is
+    # not the whole list.
+    branches: refs(refPrefix: "refs/heads/", first: 50) {
+      totalCount
+      nodes {
+        name
+        target { ... on Commit { committedDate } }
+        associatedPullRequests(states: OPEN) { totalCount }
+      }
+    }
+    releases(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) {
+      nodes { tagName publishedAt }
+    }
+  }
+
+}
