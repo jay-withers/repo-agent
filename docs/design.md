@@ -351,7 +351,7 @@ port).
   caller grants no `pull-requests: write`.
 - **ci-codeql analyses `go` and `actions`.** Go is the one language CodeQL
   cannot read without building, so the shared workflow autobuilds it with
-  mise's Go (workflows v1.36.0+).
+  mise's Go (workflows v1.38.0+).
 - `ci-terraform` calls two shared workflows, the same split
   azure-container-apps uses: `validate` comes from `terraform.yml` and reports
   `terraform / Terraform`, and `plan` calls `terraform-deploy.yml` for dev,
