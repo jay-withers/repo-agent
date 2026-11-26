@@ -2,8 +2,7 @@
   "recommendations": [
     "anthropic.claude-code",
     "hashicorp.terraform",
-    "ms-python.python",
-    "charliermarsh.ruff",
+    "golang.go",
     "redhat.vscode-yaml",
     "github.vscode-github-actions",
     "github.vscode-pull-request-github",

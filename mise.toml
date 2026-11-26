@@ -3,9 +3,8 @@
 # (jay-withers/workflows v1.26.1+), and Renovate keeps them current.
 
 [tools]
-# runs pre-commit and its Python hooks.
+# Runs pre-commit and its Python hooks. The app is Go, so nothing else uses it.
 python = "3.15.2"
-uv = "0.13.9"
 pre-commit = "4.7.0"
 # actionlint lints workflow run: blocks with it, and silently skips them without it.
 shellcheck = "0.11.0"
@@ -13,7 +12,8 @@ terraform = "1.17.2"
 tflint = "0.66.0"
 terraform-docs = "0.25.1"
 checkov = "3.4.5"
-# The Go port (cmd/, internal/): workflows' go.yml takes Go from here with
-# GOTOOLCHAIN=local, and runs this golangci-lint.
+# The app. workflows' go.yml and codeql.yml take Go from here with
+# GOTOOLCHAIN=local, and the Dockerfile's golang builder tag must be this
+# exact version (Renovate moves the two together).
 go = "1.27.4"
 golangci-lint = "2.15.0"

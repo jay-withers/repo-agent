@@ -24,13 +24,12 @@ locals {
   container_memory = "0.5Gi"
 
   # Everything the container needs that is not a secret. Secrets are resolved at
-  # runtime from Key Vault by settings.py, not injected here — an env var is
+  # runtime from Key Vault by internal/settings, not injected here — an env var is
   # visible in `az containerapp job show` output and in state.
   common_env = {
-    AZURE_CLIENT_ID                       = azurerm_user_assigned_identity.this.client_id
-    KEY_VAULT_URI                         = azurerm_key_vault.this.vault_uri
-    APPLICATIONINSIGHTS_CONNECTION_STRING = data.azurerm_application_insights.platform.connection_string
-    ENVIRONMENT                           = var.environment
+    AZURE_CLIENT_ID = azurerm_user_assigned_identity.this.client_id
+    KEY_VAULT_URI   = azurerm_key_vault.this.vault_uri
+    ENVIRONMENT     = var.environment
     # IMAGE_TAG, which the digest prints so "which code ran" needs no
     # archaeology, is set by `make deploy` alongside the image: the placeholder
     # Terraform creates with has no release tag.

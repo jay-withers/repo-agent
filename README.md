@@ -9,6 +9,10 @@ Runs as a scheduled Container Apps job on the shared environment in
 This repository owns its own resource group, Key Vault, identity and the job
 itself; the environment it runs on is shared and resolved by name.
 
+Written in Go (`cmd/repoagent`, `internal/`), and shipped as a single static
+binary on a distroless image. It was ported from Python with no visible
+change; see [The Go port](docs/design.md#the-go-port).
+
 ## Why it exists
 
 Renovate failing is silent. A preset that stops resolving, an automerge that
@@ -147,9 +151,9 @@ optionally an expiry:
 
 ```bash
 make state                      # what it remembers, including suppressions
-uv run repoagent suppress a1b2c3d4e5f6 \
+go run ./cmd/repoagent suppress a1b2c3d4e5f6 \
   --reason "deliberate teaching repo" --until 2026-12-01
-uv run repoagent unsuppress a1b2c3d4e5f6
+go run ./cmd/repoagent unsuppress a1b2c3d4e5f6
 ```
 
 The reason is required, not optional — in six months an unexplained suppression
@@ -157,7 +161,7 @@ is indistinguishable from a bug. Suppressed findings never reach the model, and
 the digest reports how many are held back so they do not become invisible.
 
 **LLM triage is optional and off by default.** `DEEPSEEK-API-KEY` is read with
-`optional_secret()`, so its absence switches the step off instead of failing the
+`settings.OptionalSecret`, so its absence switches the step off instead of failing the
 run. Worth knowing what setting it switches on: repository names, the findings,
 and truncated Renovate config, README and Dockerfile text are sent to DeepSeek,
 which is China-hosted and whose terms permit training on inputs. Only
@@ -168,40 +172,22 @@ file is clipped hard before it goes — a cost control and a privacy one.
 rate limit than the core API, and they signal it with **403, not 429**. Four
 search calls per repository across eleven repositories tripped it within seconds
 during design. Everything needed is available from the core REST API and from
-GraphQL. `fetch.py` retries 403 for the same reason.
+GraphQL. `internal/fetch` retries 403 for the same reason.
 
-## The Go port
-
-repo-agent is being ported to Go, in place. The Go version lives in `cmd/`
-and `internal/`, beside the Python version it will replace. Until the cutover,
-the Python image is still the one built and deployed. The Go version's goal is
-no visible change: the same digest, the same finding ids, the same state blob
-and the same CLI, image name and `ENTRYPOINT`.
-
-The proof is a parity test. `testdata/golden/*/fixture.json` describe what
-GitHub, DeepSeek and the state blob answer, and between them they fire every
-check. `make golden` runs the Python scan on each fixture with the clock
-frozen, and saves what came out: the digest's subject, text and HTML, the
-DeepSeek prompt, the GraphQL query and the saved state document. The Go suite
-then runs the Go scan on the same fixtures and fails unless every one of those
-outputs is byte for byte the same.
-
-```bash
-make go-test    # gofmt, vet, golangci-lint, go test -race (the parity test included)
-make go-render  # the Go `render`: compare with `make run` on the same day
-make golden     # regenerate testdata/golden from the Python, after changing a fixture
-```
-
-`make test` runs both suites. The cutover, in a later PR, does the following:
-
-- switches the Dockerfile to a distroless Go build;
-- moves `test / Test` to the Go suite;
-- deletes the Python.
+**The digest is pinned by golden files.** `testdata/golden/*/fixture.json`
+describe what GitHub, DeepSeek and the state blob answer, and between them
+they fire every check. The suite replays each fixture through the scan and
+compares the digest's subject, text and HTML, the DeepSeek prompt, the
+GraphQL query and the saved state document with `testdata/golden`, byte for
+byte. Those files were written by the Python implementation before it was
+retired, so they are what "the port changed nothing" was measured against. A
+change to the digest changes them in the same PR, deliberately.
 
 ## Local development
 
-`settings.py` reads every secret from the environment first, then `.env`, and
-only then from Key Vault (through jay-withers/appkit's `keyvault`), which is what makes this work with no Azure at all:
+`internal/settings` reads every secret from the environment first, then
+`.env`, and only then from Key Vault, which is what makes this work with no
+Azure at all:
 
 ```bash
 make install
@@ -213,8 +199,8 @@ make run                # scans real GitHub, prints the digest, sends nothing
 email, and it needs `RESEND_API_KEY` and `DIGEST_EMAIL_TO`.
 
 ```bash
-make test      # the suite; no network, no Azure, no credentials
-make typecheck # mypy; CI runs it too
+make test      # gofmt, golangci-lint, go test -race; no network, no Azure, no credentials
+make typecheck # go vet
 make lint      # every pre-commit hook
 ```
 
@@ -235,22 +221,15 @@ Terraform: `make validate` (no credentials), `make fmt`, `make plan`, and
 The reasoning behind the design, and each check's history, are in
 [docs/design.md](docs/design.md) and [docs/checks.md](docs/checks.md).
 
-### Don't trust logs from a locally emulated image
+### A locally emulated image
 
 `make build` cross-builds `linux/amd64` because that is all Container Apps
-runs. On an arm64 host that image runs under QEMU, and **QEMU silently swallows
-Python logging output**: `docker run <image> scan` exits 1 with zero bytes on
-both stdout and stderr, while the identical code logs a full traceback when
-built natively.
-
-`print()` and argparse still work, which makes it worse — the container looks
-alive and the failure looks silent. Verified both ways: 0 bytes emulated, 1582
-bytes native, same commit.
-
-So a locally emulated run tells you the exit code and nothing else. To read what
-actually happened, build without `--platform` (`docker buildx build --load -t
-repoagent:native .`) or just run `make run` outside Docker. CI runners and
-Container Apps are both native amd64, so neither is affected.
+runs, and on an arm64 host that image runs under QEMU. The Python image's
+logging vanished under QEMU (exit 1, zero bytes of output), so an emulated run
+told you nothing. The Go binary is static and logs to stdout, but the habit is
+still worth keeping: to see what really happens, build natively (`docker
+buildx build --load -t repoagent:native .`) or `make run` outside Docker. CI
+runners and Container Apps are both native amd64.
 
 ## The GitHub App
 
@@ -284,7 +263,7 @@ belongs in source or in state. `make secrets` prints the exact commands:
 
 That last one is not hypothetical: market-agent lost a day's summary to a
 recipient stored with curly quotes pasted from something that autocorrects,
-invisible in `az keyvault secret show` output. `mailer.py` now refuses it before
+invisible in `az keyvault secret show` output. `internal/mailer` now refuses it before
 the request, with a message that names the problem.
 
 None of these are needed for `terraform apply` — they are read at runtime, which
@@ -379,14 +358,11 @@ Required checks (set in github-repos): `pre-commit / Pre-commit`,
 `container-build`.
 
 - **ci-pre-commit**: every hook.
-- **ci-python** (`test / Test`): pytest, mypy over `src/` and `tests/`, ruff,
-  and two coverage floors — total coverage of `repoagent`, and the lines a PR
-  changes, must each be at least 90%.
-- **ci-go** (`go / Test`, not required yet): the Go port's checks through
-  workflows' `go.yml`: gofmt, vet, golangci-lint, `go mod tidy -diff`, the
-  race-enabled suite with the parity test, and the same two 90% coverage
-  floors. At the cutover its job becomes `test`, and ci-python goes.
-- **ci-codeql**: CodeQL code scanning of the workflows.
+- **ci-go** (`test / Test`): workflows' `go.yml`: gofmt, vet,
+  golangci-lint, `go mod tidy -diff`, the race-enabled suite with the golden
+  tests, and two coverage floors (the module's total, and the lines a PR
+  changes, each at least 90%).
+- **ci-codeql**: CodeQL code scanning of the Go and of the workflows.
 - **cd-tag** → **cd-publish**: a release on every merge; when app files
   changed, the image is published and deployed (see [Deploying](#deploying)).
 - **schedule-drift**: a nightly plan of dev, recorded in the platform's
@@ -397,7 +373,8 @@ Required checks (set in github-repos): `pre-commit / Pre-commit`,
 workflow runs on every pull request; a `changes` job decides whether the image
 build runs, and the gate passes when it was skipped and fails when it failed. It
 used to be path-filtered on the trigger and so could not be required, which let
-Renovate auto-merge a Python 3.15 base image that could not build.
+Renovate auto-merge a base image that could not build (Python 3.15, when the
+image was still Python).
 
 `ci-terraform` plans `dev` only, unlike the other Terraform repos. This
 configuration resolves the shared environment with a data source, so a plan

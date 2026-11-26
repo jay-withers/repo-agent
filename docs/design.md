@@ -1,14 +1,14 @@
 # Design notes
 
-State, infrastructure, secrets, the model's limits, the GitHub API, copied
-modules, the image, CI and deploys: the reasoning behind each decision, and
+State, infrastructure, secrets, the model's limits, the GitHub API, shared
+code, the image, the Go port, CI and deploys: the reasoning behind each decision, and
 the incidents that made it. Moved out of CLAUDE.md, which keeps the rules and
 links here.
 
 ## History
 
 One JSON document in a blob, read whole at the start of a run and written whole
-at the end — `state.py`. A blob rather than a table because there is no query to
+at the end — `internal/state`. A blob rather than a table because there is no query to
 serve, and a weekly job with `parallelism = 1` has no concurrent writer. Not
 Postgres: market-agent has one, this does not need one for a few hundred rows.
 
@@ -51,8 +51,7 @@ picks it up on the next deploy, not on apply.
 
 This repo owns its **Key Vault, managed identity and the job**. Its resource
 group is github-repos' (`create_resource_groups`), read here by data source.
-The Container Apps environment, Log Analytics workspace and Application
-Insights belong to
+The Container Apps environment and Log Analytics workspace belong to
 [`jay-withers/azure-container-apps`](https://github.com/jay-withers/azure-container-apps)
 and are shared with every other project.
 
@@ -119,12 +118,15 @@ Vault.** That is what makes `make run` work with no Azure at all, and it is why
 `.env.example` exists. Never commit a filled-in `.env` — `.gitignore` excludes
 `.env` and `.env.*` and lets the template through.
 
-**The `.env` step is explicit.** `SettingsConfigDict(env_file=".env")` loads
-that file into the `Settings` class only and never into `os.environ`, so every
+**The `.env` step is explicit.** In the Python, pydantic-settings loaded
+`.env` into the `Settings` class only, never into `os.environ`, so every
 secret written to `.env` was once silently ignored and fell through to Key
-Vault. The resolution now comes from jay-withers/appkit (`appkit.keyvault`, the
-`azure` extra, which brings `python-dotenv`), which reads `.env` itself, and
-market-agent uses the same code.
+Vault; jay-withers/appkit's `keyvault` fixed that by reading `.env` itself.
+`internal/settings` is a port of appkit's rules, `.env` parser included (quoted
+values may span lines, which the App's private key does): the environment,
+then `.env`, then Key Vault. For a secret an empty variable falls through to
+the next source; for a setting an explicitly empty variable wins. A required
+secret the vault does not hold is an error, never an empty string.
 
 Setting `KEY_VAULT_URI` in a local `.env` is a supported way to work: the secrets
 then resolve from the real vault through your own `az login`, and no private key
@@ -133,7 +135,7 @@ is written to disk.
 Secrets in use: `GITHUB-APP-ID`, `GITHUB-APP-PRIVATE-KEY`, `DIGEST-EMAIL-TO`,
 `RESEND-API-KEY`, `DEEPSEEK-API-KEY`.
 
-`DEEPSEEK-API-KEY` is read with `optional_secret()`, not `secret()`, so its
+`DEEPSEEK-API-KEY` is read with `settings.OptionalSecret`, not `Secret`, so its
 absence switches triage off rather than failing the run — the same pattern as
 `DIGEST-EMAIL-TO`. That is what keeps `make run` working with no DeepSeek
 account, and it means adding the key needs no redeploy. **`DIGEST-EMAIL-TO` must be plain ASCII** — Resend rejects a
@@ -144,20 +146,21 @@ fails on the address.
 
 ## The checks, and what the model is allowed to do
 
-**Checks are pure `(RepoSnapshot) -> list[Finding]` functions in `checks/`, and
-they establish every fact the digest reports.** They do no I/O, so they are
-tested by constructing a snapshot directly — see `tests/factories.py`, which
-defaults to a *healthy* repository so each test names only the thing it tests.
+**Checks are pure `func(model.RepoSnapshot) []model.Finding` functions in
+`internal/checks`, and they establish every fact the digest reports.** They do
+no I/O, so they are tested by constructing a snapshot directly, and the golden
+fixtures fire every one of them.
 Keep them pure. The moment a check fetches something it needs a transport, and
 the test suite stops being literals.
 
-**`llm.py` contributes `summary`, `themes` and `suggestions`, and nothing
-else.** It cannot
+**`internal/llm` contributes `summary`, `themes` and `suggestions`, and
+nothing else.** It cannot
 add, remove or alter a finding. Three things enforce that rather than merely
 asking for it:
 
-- The reply is validated against a Pydantic schema, so malformed output raises
-  instead of being pasted into an email.
+- The reply is validated strictly (`llm.ParseReply`: types, lengths, at most
+  three themes, no nulls), so malformed output is an error instead of prose
+  pasted into an email.
 - Returned finding ids are intersected with the ids that were sent, so an
   invented id is dropped.
 - Findings the model omits are appended in their original order. **The set that
@@ -185,7 +188,7 @@ checks `finish_reason == "length"` first, so a truncation says so instead of
 looking like malformed JSON. Output roughly quadrupled in cost — still under half
 a cent.
 
-This is the market-agent lesson in `digest.py` applied structurally: given a
+This is the market-agent lesson in `internal/digest` applied structurally: given a
 count and no table, a model will accurately report from what it was given that
 nothing happened on a day three trades executed. The defence is not a better
 prompt. Triage failure is caught and logged — the digest goes out unordered
@@ -241,8 +244,8 @@ one is over-costed.
 **No search API, ever.** GitHub's search endpoints carry a far tighter
 secondary rate limit than the core API and signal it with **403, not 429** —
 four search calls per repository across eleven repositories tripped it within
-seconds during design. `fetch.py` therefore retries 403 as well, which is a
-deliberate divergence from market-agent's copy.
+seconds during design. `internal/fetch` therefore retries 403 as well, a
+deliberate divergence from the market-agent code it was first copied from.
 
 Everything needed comes from `GET /installation/repositories` plus a batched
 GraphQL query. Requests are sequential on one client; secondary limits are
@@ -257,40 +260,37 @@ interpolated: `") { evil }` is a legal GitHub repository name.
 **`branchProtectionRules` and `vulnerabilityAlerts` are deliberately absent**
 from that query. Both need permissions beyond the App's read-only
 metadata/contents/pull-requests/code-scanning/issues set, and GraphQL reports a permission failure
-as an `errors` entry — which `fetch.graphql` turns into a `FetchError` that
+as an `errors` entry — which `fetch.GraphQL` turns into an error that
 fails the whole batch, not just the field. Adding either means widening the App
 first.
 
 A failed detail query **degrades** the run rather than ending it: the REST list
 alone still reports every repository and every hygiene finding.
 
-**GitHub App auth is hand-rolled on `PyJWT[crypto]`.** Sign an RS256 JWT
+**GitHub App auth is hand-rolled on golang-jwt (v5).** Sign an RS256 JWT
 (`iss` = app id, `iat` backdated 60s for clock skew, `exp` ≤ 600s or GitHub
 401s) → `GET /app/installations` → `POST /app/installations/{id}/access_tokens`
-→ a `ghs_…` token good for an hour. Cached in a module-level tuple rather than
-`@lru_cache`, because expiry has to be checked. All App permissions are
+→ a `ghs_…` token good for an hour, cached until two minutes before it
+expires, with the permissions GitHub granted it (which is how the alerts and
+issues reads know to skip a permission the App lacks). All App permissions are
 read-only; it is installed on all repositories so a new repo is covered with no
 config change.
 
-## Copied modules
+## Shared code
 
-`fetch.py`, `mailer.py`, `telemetry.py` and `cli.py` are copied from
-market-agent, each with a header naming the source file and commit.
-`settings.py`'s secret resolution is no longer a copy: the tripwire below fired
-(the `.env` bug, then three more web apps), and it comes from
-[jay-withers/appkit](https://github.com/jay-withers/appkit) as `appkit[azure]`,
-pinned in `[tool.uv.sources]` so Renovate bumps it. `Settings` stays here.
-**Re-copy rather than diverge** — the same culture as
-`scripts/check-tf-standards.sh`, which is shared verbatim across five repos.
+The Python copied `fetch.py`, `mailer.py`, `telemetry.py` and `cli.py` from
+market-agent and took secret resolution from jay-withers/appkit. The Go has
+nothing to share them with, so each is a package here: `internal/fetch`,
+`internal/mailer`, `cmd/repoagent` and `internal/settings` (a port of appkit's
+`keyvault`, with its tests). Telemetry is gone; see
+[The Go port](#the-go-port).
 
-This is consumer #2, so no library was extracted: a published package for a
-solo maintainer buys a release workflow, version pins and a Renovate rule
-against an imagined third consumer, while making a `fetch.py` change here able
-to break market-agent's trading path. Half the copied code diverges
-legitimately anyway (no Postgres here, GitHub-specific retry).
+**Tripwire to revisit:** a second Go app in the estate. Then
+`internal/settings` (and probably `internal/fetch`) become a shared Go module,
+the Go counterpart of appkit, rather than a second copy.
 
-**Tripwire to revisit:** a third consumer appears, *or* the same bug gets fixed
-twice in copied code.
+`scripts/check-tf-standards.sh` is still shared verbatim with the other
+Terraform repos. **Re-copy rather than diverge.**
 
 ## Docker
 
@@ -298,20 +298,27 @@ The image runs as **uid 10001, numerically** — a named `USER` trips hadolint's
 DL3066, and a runtime enforcing `runAsNonRoot` has to resolve the user before
 the container starts without being able to read the image's `/etc/passwd`.
 
-**`uv sync` installs the project editable by default**, producing a `.pth`
-pointing at the build stage's path. The runtime stage copies only the
-virtualenv, so the image fails with a bare `No module named 'repoagent'` from a
-venv that looks complete. `--no-editable` on both syncs is the fix.
+**Two stages: the official `golang` image builds, distroless runs.** The
+builder's tag is the exact patch of `mise.toml`'s `go` (Renovate's go preset
+moves both in one PR), and it builds a static binary (`CGO_ENABLED=0`,
+`-trimpath`). The runtime is `gcr.io/distroless/static-debian13`: CA
+certificates, tzdata and `/etc/passwd`, no shell and no package manager. That
+is a deliberate exception to the estate's rule that apps build on
+dev-containers' `python-app`: the image has no Python, so there is nothing
+for that base to provide, and a static binary needs nothing a distroless base
+lacks. Both images are digest-pinned. The binary is
+`/usr/local/bin/repoagent`, so `ENTRYPOINT ["repoagent"]` resolves on `PATH`
+as the console script did.
 
 Dockerfiles are linted by the local `scripts/hadolint.sh`, **not** the upstream
 `hadolint-docker` hook — that one calls `docker system info` and buries an
 unreachable daemon in a wall of JSON; the wrapper says what is wrong instead.
 
-**QEMU emulation swallows Python logging.** An amd64 image run under emulation
-on arm64 exited 1 with **zero bytes** on both streams; the same image built
-natively produced a full traceback. `print()` and argparse still worked. If a
-container fails silently, rebuild for the host architecture before believing
-the code is at fault.
+**QEMU emulation swallowed the Python image's logging.** An amd64 image run
+under emulation on arm64 exited 1 with **zero bytes** on both streams; the same
+image built natively produced a full traceback. The Go binary has not been
+seen to do that, but if a container fails silently, rebuild for the host
+architecture before believing the code is at fault.
 
 Only amd64 is built and pushed, because Container Apps runs nothing else.
 
@@ -330,26 +337,21 @@ checks — set in `github-repos`, not here — are `pre-commit / Pre-commit`,
 workflow runs on every pull request; a `changes` job decides whether the image
 build runs, and the gate passes when it was skipped and fails when it failed. It
 used to be path-filtered on the trigger and so could not be required, which let
-Renovate auto-merge a Python 3.15 base image that could not build.
+Renovate auto-merge a base image that could not build (Python 3.15, before the
+port).
 
-- **`extras: dev` on ci-python is the input that matters.** pytest is an
-  *extra*, not a dependency group, and `uv run` installs groups but not extras
-  — without it the job fails with a bare `Failed to spawn: pytest` after a
-  successful-looking install.
-- The interpreter is `mise.toml`'s `python`, and `ci-container-build` checks it
-  is the image's. The reusable workflow runs `uv run --locked`, so a
-  `pyproject.toml` edited without its lockfile fails in CI rather than on
-  someone's machine.
-- **ci-go runs the Go port** through workflows' `go.yml`, as job `go`. Its
-  context is `go / Test`, which nothing requires yet. The cutover renames the
-  job to `test` and deletes ci-python, so `test / Test` moves to Go with no
-  change in github-repos. See [The Go port](#the-go-port).
+- **`test / Test` is ci-go**, workflows' `go.yml`: gofmt, vet, golangci-lint,
+  `go mod tidy -diff`, the race-enabled suite and its golden tests. Go and
+  golangci-lint come from `mise.toml` with `GOTOOLCHAIN=local`, so CI tests
+  with the Go the Dockerfile's builder is pinned to. The job id `test` is what
+  kept the required context unchanged through the port.
 - **Coverage is gated at 90%, total and diff.** `coverage-min` and
-  `diff-coverage` fail `test / Test` under 90%; the table is in the job
-  summary, with no PR comment, so the caller grants no `pull-requests: write`.
-  `pytest-cov` is injected by the workflow with `uv run --with`, an ephemeral
-  overlay that needs no dependency here and does not invalidate `--locked`.
-  `lint: true` runs `ruff check` and `ruff format --check` there too.
+  `diff-coverage` fail `test / Test` under 90%, measured across packages
+  (`-coverpkg`); the table is in the job summary, with no PR comment, so the
+  caller grants no `pull-requests: write`.
+- **ci-codeql analyses `go` and `actions`.** Go is the one language CodeQL
+  cannot read without building, so the shared workflow autobuilds it with
+  mise's Go (workflows v1.36.0+).
 - `ci-terraform` calls two shared workflows, the same split
   azure-container-apps uses: `validate` comes from `terraform.yml` and reports
   `terraform / Terraform`, and `plan` calls `terraform-deploy.yml` for dev,
@@ -382,13 +384,14 @@ Renovate auto-merge a Python 3.15 base image that could not build.
 
 ## The Go port
 
-repo-agent is being ported to Go, mostly as a learning exercise. It suited Go
-best of the estate's apps: a weekly job with no web UI, made of REST and
-GraphQL calls, a signed JWT, pure checks and one JSON blob. The port happens in
-place, in `cmd/repoagent` and `internal/`, beside the Python, and the Python
-image stays the shipped one until a separate cutover PR.
+repo-agent was written in Python and ported to Go in November 2026, mostly as
+a learning exercise. It suited Go best of the estate's apps: a weekly job with
+no web UI, made of REST and GraphQL calls, a signed JWT, pure checks and one
+JSON blob. The port was built in place beside the Python (#193), proven
+against it, and then replaced it (the cutover PR), so the job, the image name,
+the Terraform and the required checks never moved.
 
-**The goal is no visible change.** These all stay the same:
+**The goal was no visible change.** These all stayed the same:
 
 - the digest's text and HTML;
 - `Finding.id` (`sha256("repo:check")[:12]`);
@@ -412,13 +415,15 @@ The decisions behind it:
   - invented finding ids and suggestions;
   - a failed detail query.
 
-  `scripts/golden.py` (`make golden`) runs the real Python scan on each
-  fixture and writes what came out: subject, text, HTML, prompt, system
-  prompt, detail query and saved state. `internal/scan/golden_test.go` runs
-  the Go scan on the same fixture and compares every file byte for byte. A
-  fixture change is regenerated from the Python, never hand-edited into a
-  golden file. The golden files outlive the Python as the Go suite's
-  fixtures.
+  A Python script (removed at the cutover with the rest of the
+  Python) ran the real Python scan on each fixture and wrote what came out:
+  subject, text, HTML, prompt, system prompt, detail query and saved state.
+  `internal/scan/golden_test.go` runs the Go scan on the same fixtures and
+  compares every file byte for byte. They passed before the Python was
+  deleted, and they stay as the suite's regression tests: **a change to the
+  digest, the prompt, the query or the state document changes the golden
+  file in the same PR**, on purpose and reviewed, since nothing can
+  regenerate it now.
 - **`internal/pyfmt` reproduces Python's formatting** wherever the Python's
   output depends on it:
 
@@ -447,7 +452,9 @@ The decisions behind it:
     Python's exception class, which Go errors do not have.
 - **No App Insights export.** Go has no Azure Monitor OpenTelemetry distro,
   and nothing reads repo-agent's traces. The console logs still reach
-  Log Analytics. The cutover drops the connection string from the job's env.
+  Log Analytics. The cutover dropped the connection string from Terraform's
+  `common_env`; the job's `env` is under `ignore_changes`, so the running job
+  keeps the unused variable until it is next recreated, and nothing reads it.
 - **Secret resolution is a port of appkit's `keyvault`** (`internal/settings`):
   the environment, then `.env`, then Key Vault, with appkit's rule that an
   empty variable falls through. appkit is Python-only, so it stays here until
@@ -455,10 +462,11 @@ The decisions behind it:
 - **The standard library, plus three dependencies**: `golang-jwt` for the App
   JWT, and the Azure SDK's `azidentity`, `azsecrets` and `azblob`. There is
   no GitHub client library; the query is the hand-written one.
-- **A Python-only difference was ported faithfully, not fixed**, where a
-  reader could see it. For example, the operator log line
-  `state updated: <id> suppressd` keeps its typo until the Python has gone,
-  so the parity is exact.
+- **Python quirks were ported faithfully, then fixed after the cutover.** The
+  operator log line read `state updated: <id> suppressd` in the Python; the
+  Go kept the typo while parity mattered and the cutover fixed it.
+- **Python stays in `mise.toml`** only because pre-commit runs on it. Nothing
+  in the app or the image uses it.
 
 ## `make deploy` is az cli, not terraform apply
 

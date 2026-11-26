@@ -5,8 +5,9 @@
 // suggestions are labelled as opinion. Everything GitHub or the model
 // supplies is escaped on the way into the HTML.
 //
-// The output is the Python digest.py's, byte for byte: the golden tests in
-// testdata/golden compare against what the Python rendered.
+// The output is pinned byte for byte by testdata/golden, which the Python
+// implementation rendered before the port: a change here changes those files
+// in the same PR, on purpose.
 package digest
 
 import (

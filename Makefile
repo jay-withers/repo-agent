@@ -10,54 +10,38 @@ IMAGE_TAG_EXPLICIT := $(filter-out file,$(origin IMAGE_TAG))
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install lint test go-test go-render golden typecheck run build push deploy deployed-tag smoke start logs state init fmt validate plan apply secrets
+.PHONY: help install lint test typecheck run build push deploy deployed-tag smoke start logs state init fmt validate plan apply secrets
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
-install: ## Install mise tools, pre-commit hooks and Python dependencies
+install: ## Install mise tools (Go, golangci-lint, the Terraform tools) and pre-commit hooks
 	mise install
 	pre-commit install
 	pre-commit install --hook-type commit-msg
-	uv sync --extra dev
+	go mod download
 
-test: go-test ## Run the test suites: the Go port's, then the Python's
-	# --extra dev: pytest is an extra, not a dependency group, so `uv run` does
-	# not install it. Without this the target only works after `make install`.
-	uv run --extra dev pytest
-
-# The Go port, beside the Python until the cutover. The same checks CI's
-# go.yml runs: gofmt, vet, golangci-lint, and the race-enabled suite, which
-# includes the parity test against testdata/golden.
-go-test: ## Run the Go port's checks and tests (gofmt, vet, golangci-lint, go test -race)
+# The checks CI's go.yml runs: gofmt, vet, golangci-lint and the race-enabled
+# suite, which includes the golden tests against testdata/golden.
+test: ## Run gofmt, go vet, golangci-lint and the suite (go test -race)
 	@unformatted="$$(gofmt -l cmd internal)"; \
 		if [ -n "$$unformatted" ]; then echo "gofmt needed:"; echo "$$unformatted"; exit 1; fi
 	go vet ./...
 	golangci-lint run ./...
 	go test -race ./...
 
-# The Go port's `render`, for comparing against `make run` on the same day:
-# the two digests should be identical apart from the timing of the scan.
-go-render: ## Scan and print the digest with the Go port, sending no email
-	go run ./cmd/repoagent render
-
-# Rewrites testdata/golden/*/ from the Python scan replaying each fixture.
-# Run after changing a fixture; `make go-test` then proves the Go agrees.
-golden: ## Regenerate the Go port's golden files from the Python scan
-	uv run --extra dev python scripts/golden.py
-
-typecheck: ## Type-check src/ and tests/ with mypy (config in pyproject.toml)
-	uv run --extra dev mypy
+typecheck: ## go vet: the compiler's checks beyond type-checking
+	go vet ./...
 
 lint: ## Run every pre-commit hook against every file
 	pre-commit run --all-files
 
 # Reads real GitHub and prints the digest without sending it. Needs
 # GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY in the environment or a .env —
-# settings.py reads env first, so no Azure is involved.
+# internal/settings reads env first, so no Azure is involved.
 run: ## Scan and print the digest locally, sending no email
-	uv run repoagent render
+	go run ./cmd/repoagent render
 
 build: ## Build the image for linux/amd64 (set IMAGE_TAG, defaults to the git SHA)
 	docker buildx build --platform linux/amd64 --load \
@@ -121,7 +105,7 @@ smoke: ## Check IMAGE_TAG is set on the scan job, and selfcheck it (IMAGE_TAG re
 # Contributor on the container — which whoever applied the Terraform has.
 state: ## Print what the scan remembers between runs
 	STATE_CONTAINER_URL="$$(terraform -chdir=$(TF_DIR) output -raw state_container_url)" \
-		uv run repoagent state
+		go run ./cmd/repoagent state
 
 # A scheduled job has no other way to be triggered.
 start: ## Trigger one scan execution now

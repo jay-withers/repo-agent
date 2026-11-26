@@ -41,7 +41,7 @@ That is exactly the "configured but not working" gap this agent exists for.
   `auth.permitted` reads the token's own `permissions` grant and the fetch is
   skipped outright without it — probing would 403, and `fetch` retries 403 as a
   secondary rate limit, costing seconds per repository to learn nothing.
-- **`code_scanning_alerts` is a tri-state.** `None` (no permission, a 404 because
+- **`CodeScanningAlerts` is a tri-state.** nil (no permission, a 404 because
   CodeQL has never run, any failure) stays silent; `()` is CodeQL having run and
   found nothing. A repository without CodeQL is not reported as clean.
 - **Fetched independently of the detail query**, so a GraphQL failure does not
@@ -74,7 +74,7 @@ repo's own Terraform. **The useful inversion is coverage** — `estate.unmanaged
 asks what exists on GitHub that the catalogue does not declare, because nothing
 is enforcing anything on those.
 
-`in_catalogue` is a **tri-state**. `None` means the catalogue could not be read
+`InCatalogue` is a **tri-state**. nil means the catalogue could not be read
 and must never render as "every repository is unmanaged", which is what a plain
 boolean produces the first time the file moves. `catalogue_repo` empty switches
 the check off entirely for the same reason.
@@ -93,11 +93,11 @@ registry's zip hashes, present regardless, so counting those proves nothing.
 `test_platform_names_are_never_looked_for_in_a_lock_file` pins this.
 
 **Lock files and workflows are read whole; only prompt-bound files are capped.**
-`_blob_text` truncates at `MAX_FILE_BYTES` (8,000) by default, which once cut
+`blobText` truncates at `MaxFileChars` (8,000 characters) by default, which once cut
 terraform-root-aks's 9.7 KB lock inside its last block and reported a correct
 lock as `tls (0 of 3)` every week. Workflows had the same problem: four in
 `jay-withers/workflows` are over the cap. Neither ever reaches the model, so
-both pass `capped=False`; README, Dockerfile and Renovate config keep the cap.
+both are read with `blobText(..., false)`; README, Dockerfile and Renovate config keep the cap.
 
 **`estate.unreportable_required_check` compares the two halves of that
 catalogue.** It reads `required_status_checks` out of the same block the
@@ -151,9 +151,9 @@ Run against this repository's own workflows it produces nothing, which is
 the test that matters: those exclusions are what make the difference between
 four correct recommendations on a fresh repository and four wrong ones here.
 
-`required_checks` is a **tri-state here too, and for a sharper reason than
-elsewhere**: `None` (catalogue unreadable, or the repository is absent from it —
-`estate.unmanaged` owns the second) must stay silent, while an **empty tuple is
+`RequiredChecks` is a **tri-state here too, and for a sharper reason than
+elsewhere**: nil (catalogue unreadable, or the repository is absent from it —
+`estate.unmanaged` owns the second) must stay silent, while an **empty slice is
 a claim** — declared, requiring nothing — and is precisely the case this check
 was written for. `unreportable_required_check`'s `if not required` conflates the
 two harmlessly; this one must not.
@@ -175,7 +175,7 @@ workflow triggered **only** by `workflow_call` is skipped. A called workflow's
 token is whatever its caller grants, and `jay-withers/workflows` leaves them
 unscoped on purpose. The first survey of the estate reported three of them
 until this exemption was added. Job
-parsing is in `checks/workflow_text.py`, shared with `estate`. Extend it there
+parsing is in `internal/checks/workflowtext.go`, shared with `estate`. Extend it there
 instead of writing a second regex.
 
 `workflows.pull_request_target_checkout` fires only when the workflow **also**
@@ -191,7 +191,7 @@ against regressions in repositories that did not start from the template.
 `stalled_prs`. That keeps any one pull request from being reported twice. It is
 measured from `updatedAt`, not creation.
 
-`branches` is a **tri-state**, like `in_catalogue`. `None` (the detail query did
+`Branches` is a **tri-state**, like `InCatalogue`. nil (the detail query did
 not answer) stays silent. The page holds 50 refs, because GraphQL scores
 *potential* nodes across the ten-repository batch. `branch_total` lets the check
 say "at least" when the page does not hold every branch.
@@ -209,12 +209,12 @@ release held from deploying; running cd-publish with its tag deploys it and
 closes it). Creating any of them emails the owner once, and the digest is the weekly reminder of whatever is still open.
 
 - **The label names are a contract** with the workflows; the constants in
-  `checks/delivery.py` must match them.
+  `internal/checks/delivery.go` must match them.
 - **Issues come over REST** (`client.open_issues`, one page of 100 per repo),
   gated on the App's **Issues** permission exactly as code scanning is gated
   on `security_events`: without it nothing is requested and the checks stay
   silent. `/issues` lists pull requests too; `parse.issues` drops them.
-- `open_issues` is a tri-state like `code_scanning_alerts`: `None` (no
+- `OpenIssues` is a tri-state like `CodeScanningAlerts`: nil (no
   permission, or the request failed) must never read as "no failed deploys".
 
 ## Renovate PRs that cannot merge
@@ -231,7 +231,7 @@ stayed frozen. The digest said "not being merged" each week and never said why.
 - `mergeStateStatus` needs only Pull requests: read. `statusCheckRollup` would
   say more but wants the Checks permission too, and a permission failure in
   GraphQL fails the whole detail batch.
-- **5 days, coupled to the Sunday scan** like `BACKLOG_MIN_AGE_DAYS`: Monday's
+- **5 days, coupled to the Sunday scan** like `BacklogMinAgeDays`: Monday's
   batch is 5-6 whole days old at Sunday 18:00. It was a week, which missed
   that batch every time and named it the Sunday after: security-testing#32
   and terraform-root-aks#91 first appeared at 13 and 12 days (November 2026).
@@ -268,9 +268,9 @@ Two operator notes worth keeping:
   to run again` does not: the run re-evaluates the schedule, finds it is not
   Monday morning, and parks everything again. The existence of two separate
   checkboxes is the proof.
-- `renovate_pr_ever` is a **tri-state**, for the same reason `in_catalogue` is.
+- `RenovatePREver` is a **tri-state**, for the same reason `InCatalogue` is.
   The closed-PR history is one 30-node page, so a repository with a long human
-  history fills it with human pull requests. `None` means the page could not
+  history fills it with human pull requests. nil means the page could not
   answer, and must never render as "Renovate has never run" — that would report
   the estate's busiest repositories as its deadest.
 
@@ -305,12 +305,12 @@ worth knowing:
 - **Sunday is off-peak for DeepSeek**, which bills peak rates on weekdays only,
   so triage now costs half what it did. That was not the reason to move and is
   not a reason to move back.
-- **`BACKLOG_MIN_AGE_DAYS` is coupled to the cron.** At `0 7 * * 1` it had to be
+- **`BacklogMinAgeDays` is coupled to the cron.** At `0 7 * * 1` it had to be
   a week or every healthy repository read as backlogged; on Sunday it is 2,
   because a batch that never merged is six days old when the scan sees it.
   Move the cron and this number moves with it, in the same direction — too high
   on a Sunday scan and a week's failed batch is missed entirely. The same holds
-  for `BLOCKED_PR_DAYS` (5).
+  for `BlockedPRDays` (5).
 
 The count itself is measured against the preset's `prConcurrentLimit: 20`,
 **not** Renovate's default of 10.

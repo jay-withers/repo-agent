@@ -1,13 +1,8 @@
 .git
 .github
-.venv
 terraform
 scripts
-tests
-**/__pycache__
-**/*.pyc
-.pytest_cache
-.ruff_cache
+testdata
 .env
 .env.*
 !.env.example
