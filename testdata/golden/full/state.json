@@ -1,0 +1,234 @@
+{
+  "version": 1,
+  "last_run": "2026-11-29T18:00:00+00:00",
+  "findings": {
+    "1af25dc5db6c": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "renovate.blocked_prs",
+      "title": "2 Renovate PR(s) cannot merge"
+    },
+    "1ff903bce5de": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "workflows.retired_runners",
+      "title": "workflow uses a retired runner image"
+    },
+    "20b845ac3091": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/beta",
+      "check": "estate.unmanaged",
+      "title": "not in the github-repos catalogue"
+    },
+    "23ce8a07363f": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "security.open_code_scanning_alerts",
+      "title": "8 open CodeQL and Trivy and unknown tool alert(s)"
+    },
+    "260b70943bb6": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "delivery.deploy_pending",
+      "title": "Releases waiting to be deployed"
+    },
+    "272fc3cefe79": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/beta",
+      "check": "hygiene.no_ci",
+      "title": "no CI workflows"
+    },
+    "40e36daa1eb6": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "delivery.build_failed",
+      "title": "Image build on main is failing"
+    },
+    "4ee529d298bc": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "estate.unenforced_check",
+      "title": "2 pull request check(s) nothing requires"
+    },
+    "573a93e2b998": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "delivery.deploy_failed",
+      "title": "1 failed deploy(s) not yet fixed"
+    },
+    "6398778f6c43": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/beta",
+      "check": "hygiene.no_license",
+      "title": "public repository with no licence"
+    },
+    "6ccf3a40efdc": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/beta",
+      "check": "hygiene.no_description",
+      "title": "no description"
+    },
+    "6d7cc9180d12": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/delta",
+      "check": "security.open_code_scanning_alerts",
+      "title": "1 open CodeQL alert(s)"
+    },
+    "6e9ab408ba7f": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/gamma",
+      "check": "renovate.default_config_only",
+      "title": "Renovate config is the untouched default"
+    },
+    "7179ecc3e46c": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "delivery.terraform_pending",
+      "title": "Terraform changes waiting to be applied"
+    },
+    "7c3014f83e6b": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "workflows.unscoped_token",
+      "title": "1 workflow(s) with an unscoped GITHUB_TOKEN"
+    },
+    "862cdcdd1b9f": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "estate.unreportable_required_check",
+      "title": "1 required status check(s) nothing reports"
+    },
+    "8d8a47c26c53": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/epsilon",
+      "check": "security.open_code_scanning_alerts",
+      "title": "1 open CodeQL alert(s)"
+    },
+    "98db422ffb5f": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "estate.incomplete_terraform_lock",
+      "title": "1 provider(s) locked for too few platforms"
+    },
+    "99929a6407b8": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "workflows.unpinned_first_party_actions",
+      "title": "2 GitHub-owned action(s) pinned to a tag"
+    },
+    "9db8837e5ace": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/gamma",
+      "check": "renovate.onboarding_unmerged",
+      "title": "Renovate onboarding PR never merged"
+    },
+    "a3cb6f4fcdc8": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "hygiene.stale_branches",
+      "title": "at least 13 stale branch(es) with no open pull request"
+    },
+    "a630988cacbe": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/delta",
+      "check": "estate.not_shared_preset",
+      "title": "Renovate config does not extend the shared preset"
+    },
+    "b90a7e54db0e": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "workflows.pull_request_target_checkout",
+      "title": "pull_request_target workflow handles the pull request's own code"
+    },
+    "b989f58fb2d6": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "hygiene.abandoned_prs",
+      "title": "at least 4 abandoned pull request(s)"
+    },
+    "ba3e96ea7e06": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "workflows.unpinned_actions",
+      "title": "4 third-party action(s) pinned to a mutable tag"
+    },
+    "bb5218464dd4": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/delta",
+      "check": "estate.unenforced_check",
+      "title": "2 pull request check(s) nothing requires"
+    },
+    "c54c8b3d69d1": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/gamma",
+      "check": "delivery.terraform_pending",
+      "title": "Terraform changes waiting to be applied"
+    },
+    "cd64962fcfec": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/gamma",
+      "check": "workflows.unscoped_token",
+      "title": "1 workflow(s) with an unscoped GITHUB_TOKEN"
+    },
+    "d1196d547a68": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/gamma",
+      "check": "estate.not_shared_preset",
+      "title": "Renovate config does not extend the shared preset"
+    },
+    "db976a100758": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "renovate.stalled_prs",
+      "title": "Renovate updates are not being merged"
+    },
+    "e0c3147091b1": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/beta",
+      "check": "hygiene.stale",
+      "title": "no pushes in six months"
+    },
+    "e1325ec97861": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "container.unpinned_base_image",
+      "title": "2 base image(s) not pinned to a digest"
+    },
+    "ea5e3271ab97": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/beta",
+      "check": "renovate.missing_config",
+      "title": "no Renovate configuration"
+    },
+    "ef913d3525dd": {
+      "first_seen": "2026-10-01",
+      "repo": "jay-withers/beta",
+      "check": "hygiene.no_readme",
+      "title": "no README"
+    },
+    "f8c77d905d25": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/delta",
+      "check": "renovate.never_opened_a_pr",
+      "title": "Renovate has never opened a pull request here"
+    },
+    "fa501dafa491": {
+      "first_seen": "2026-11-29",
+      "repo": "jay-withers/alpha",
+      "check": "container.runs_as_root",
+      "title": "container runs as root"
+    }
+  },
+  "suppressed": {
+    "6ccf3a40efdc": {
+      "reason": "it's fine",
+      "until": "2027-01-01",
+      "added": "2026-11-01"
+    },
+    "e0c3147091b1": {
+      "reason": "parked",
+      "until": null,
+      "added": "2026-11-01"
+    }
+  }
+}

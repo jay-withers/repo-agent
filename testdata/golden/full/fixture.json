@@ -1,0 +1,1055 @@
+{
+  "now": "2026-11-29T18:00:00+00:00",
+  "send_email": true,
+  "image_tag": "v9.9.9",
+  "permissions": {
+    "metadata": "read",
+    "contents": "read",
+    "security_events": "read",
+    "issues": "read"
+  },
+  "repos": [
+    {
+      "name": "alpha",
+      "full_name": "jay-withers/alpha",
+      "description": "Alpha <service> & co",
+      "default_branch": "main",
+      "archived": false,
+      "pushed_at": "2026-11-27T18:00:00Z",
+      "created_at": "2025-10-25T18:00:00Z",
+      "topics": [],
+      "license": {
+        "key": "mit"
+      },
+      "html_url": "https://github.com/jay-withers/alpha",
+      "private": false
+    },
+    {
+      "name": "beta",
+      "full_name": "jay-withers/beta",
+      "description": null,
+      "default_branch": "main",
+      "archived": false,
+      "pushed_at": "2026-05-13T18:00:00Z",
+      "created_at": "2025-10-25T18:00:00Z",
+      "topics": [],
+      "license": null,
+      "html_url": "https://github.com/jay-withers/beta",
+      "private": false
+    },
+    {
+      "name": "gamma",
+      "full_name": "jay-withers/gamma",
+      "description": "The gamma repository",
+      "default_branch": "main",
+      "archived": false,
+      "pushed_at": "2026-11-27T18:00:00Z",
+      "created_at": "2025-10-25T18:00:00Z",
+      "topics": [],
+      "license": null,
+      "html_url": "https://github.com/jay-withers/gamma",
+      "private": true
+    },
+    {
+      "name": "delta",
+      "full_name": "jay-withers/delta",
+      "description": "The delta repository",
+      "default_branch": "main",
+      "archived": false,
+      "pushed_at": "2026-11-27T18:00:00Z",
+      "created_at": "2026-10-30T18:00:00Z",
+      "topics": [],
+      "license": {
+        "key": "mit"
+      },
+      "html_url": "https://github.com/jay-withers/delta",
+      "private": false
+    },
+    {
+      "name": "archived-one",
+      "full_name": "jay-withers/archived-one",
+      "description": "",
+      "default_branch": "main",
+      "archived": true,
+      "pushed_at": "2026-11-27T18:00:00Z",
+      "created_at": "2025-10-25T18:00:00Z",
+      "topics": [],
+      "license": {
+        "key": "mit"
+      },
+      "html_url": "https://github.com/jay-withers/archived-one",
+      "private": false
+    },
+    {
+      "name": "tut",
+      "full_name": "jay-withers/tut",
+      "description": "The tut repository",
+      "default_branch": "main",
+      "archived": false,
+      "pushed_at": "2026-11-27T18:00:00Z",
+      "created_at": "2025-10-25T18:00:00Z",
+      "topics": [
+        "learning",
+        "Tutorial"
+      ],
+      "license": {
+        "key": "mit"
+      },
+      "html_url": "https://github.com/jay-withers/tut",
+      "private": false
+    },
+    {
+      "name": "epsilon",
+      "full_name": "jay-withers/epsilon",
+      "description": "The epsilon repository",
+      "default_branch": "main",
+      "archived": false,
+      "pushed_at": "2026-11-27T18:00:00Z",
+      "created_at": "2026-11-26T18:00:00Z",
+      "topics": [],
+      "license": {
+        "key": "mit"
+      },
+      "html_url": "https://github.com/jay-withers/epsilon",
+      "private": false
+    }
+  ],
+  "details": {
+    "jay-withers/alpha": {
+      "nameWithOwner": "jay-withers/alpha",
+      "defaultBranchRef": {
+        "name": "main"
+      },
+      "renovate0": {
+        "text": "{\"extends\": [\"github>jay-withers/renovate\"]}"
+      },
+      "renovate1": null,
+      "renovate2": null,
+      "renovate3": null,
+      "renovate4": null,
+      "renovate5": null,
+      "readme": {
+        "text": "# alpha\n\nÜnïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. Ünïcode text — with “quotes” & <html>. "
+      },
+      "dockerfile": {
+        "text": "# syntax=docker/dockerfile:1\nFROM --platform=$BUILDPLATFORM golang:1.27 AS build\nRUN go build\nFROM build AS test\nFROM ${BASE}\nfrom gcr.io/distroless/static-debian12 as final\nUSER root\n"
+      },
+      "tflock": {
+        "text": "# This file is maintained automatically by \"terraform init\".\nprovider \"registry.terraform.io/hashicorp/azurerm\" {\n  version = \"4.1.0\"\n  hashes = [\n    \"h1:aaa=\",\n    \"h1:bbb=\",\n    \"h1:ccc=\",\n    \"zh:111\",\n  ]\n}\n\nprovider \"registry.terraform.io/hashicorp/random\" {\n  version = \"3.6.0\"\n  hashes = [\n    \"h1:ddd=\", \"zh:222\",\n  ]\n}\n"
+      },
+      "tflock_root": null,
+      "workflows": {
+        "entries": [
+          {
+            "name": "ci.yml",
+            "object": {
+              "text": "name: ci\non:\n  pull_request:\n    branches: [main]\n  push:\njobs:\n  pre-commit:\n    uses: jay-withers/workflows/.github/workflows/pre-commit.yml@0123456789abcdef0123456789abcdef01234567 # v1\n  test:\n    name: Test\n    runs-on: ubuntu-20.04\n    steps:\n      - uses: actions/checkout@v4\n      - uses: some-org/some-action@v2\n      - uses: other/thing@main\n      - uses: 'third/quoted@v1.2.3'\n      - uses: fourth/one@v9\n  build:\n    runs-on: [ubuntu-latest]\n    needs: [test]\n    strategy:\n      matrix:\n        x: [1, 2]\n    steps:\n      - run: echo\n  codeql:\n    uses: jay-withers/workflows/.github/workflows/codeql.yml@0123456789abcdef0123456789abcdef01234567\n"
+            }
+          },
+          {
+            "name": "pr.yaml",
+            "object": {
+              "text": "on: pull_request_target\npermissions:\n  contents: read\njobs:\n  label:\n    runs-on: windows-2019\n    steps:\n      - uses: actions/checkout@0123456789abcdef0123456789abcdef01234567\n        with:\n          ref: ${{ github.event.pull_request.head.sha }}\n      - uses: github/codeql-action/init@v3\n"
+            }
+          },
+          {
+            "name": "reusable.yml",
+            "object": {
+              "text": "on:\n  workflow_call:\njobs:\n  inner:\n    runs-on: ubuntu-20.04\n"
+            }
+          },
+          {
+            "name": "scoped.yml",
+            "object": {
+              "text": "on:\n  schedule:\n    - cron: '0 0 * * 0'\njobs:\n  a:\n    permissions:\n      contents: read\n    runs-on: ubuntu-latest\n  b:\n    needs:\n      - a\n    permissions:\n      contents: read\n    runs-on: ubuntu-latest\n"
+            }
+          },
+          {
+            "name": "notes.md",
+            "object": {
+              "text": "not a workflow"
+            }
+          }
+        ]
+      },
+      "pullRequests": {
+        "totalCount": 40,
+        "nodes": [
+          {
+            "number": 1,
+            "title": "chore(deps): update a",
+            "url": "https://github.com/jay-withers/alpha/pull/1",
+            "isDraft": false,
+            "createdAt": "2026-11-04T18:00:00Z",
+            "updatedAt": "2026-11-04T18:00:00Z",
+            "author": {
+              "login": "renovate"
+            },
+            "mergeStateStatus": "CLEAN"
+          },
+          {
+            "number": 2,
+            "title": "chore(deps): update b",
+            "url": "https://github.com/jay-withers/alpha/pull/2",
+            "isDraft": false,
+            "createdAt": "2026-11-22T18:00:00Z",
+            "updatedAt": "2026-11-22T18:00:00Z",
+            "author": {
+              "login": "renovate[bot]"
+            },
+            "mergeStateStatus": "CLEAN"
+          },
+          {
+            "number": 3,
+            "title": "chore(deps): update c",
+            "url": "https://github.com/jay-withers/alpha/pull/3",
+            "isDraft": false,
+            "createdAt": "2026-11-23T18:00:00Z",
+            "updatedAt": "2026-11-23T18:00:00Z",
+            "author": {
+              "login": "renovate"
+            },
+            "mergeStateStatus": "CLEAN"
+          },
+          {
+            "number": 4,
+            "title": "chore(deps): update d",
+            "url": "https://github.com/jay-withers/alpha/pull/4",
+            "isDraft": false,
+            "createdAt": "2026-11-24T18:00:00Z",
+            "updatedAt": "2026-11-24T18:00:00Z",
+            "author": {
+              "login": "Renovate-Bot"
+            },
+            "mergeStateStatus": "CLEAN"
+          },
+          {
+            "number": 5,
+            "title": "chore(deps): update e",
+            "url": "https://github.com/jay-withers/alpha/pull/5",
+            "isDraft": false,
+            "createdAt": "2026-11-25T18:00:00Z",
+            "updatedAt": "2026-11-25T18:00:00Z",
+            "author": {
+              "login": "renovate"
+            },
+            "mergeStateStatus": "CLEAN"
+          },
+          {
+            "number": 6,
+            "title": "chore(deps): update f",
+            "url": "https://github.com/jay-withers/alpha/pull/6",
+            "isDraft": false,
+            "createdAt": "2026-11-26T18:00:00Z",
+            "updatedAt": "2026-11-26T18:00:00Z",
+            "author": {
+              "login": "renovate"
+            },
+            "mergeStateStatus": "CLEAN"
+          },
+          {
+            "number": 7,
+            "title": "chore(deps): lock file maintenance",
+            "url": "https://github.com/jay-withers/alpha/pull/7",
+            "isDraft": false,
+            "createdAt": "2026-11-19T18:00:00Z",
+            "updatedAt": "2026-11-19T18:00:00Z",
+            "author": {
+              "login": "renovate"
+            },
+            "mergeStateStatus": "DIRTY"
+          },
+          {
+            "number": 8,
+            "title": "fix(deps): update \"quoted\" dep",
+            "url": "https://github.com/jay-withers/alpha/pull/8",
+            "isDraft": false,
+            "createdAt": "2026-11-23T18:00:00Z",
+            "updatedAt": "2026-11-23T18:00:00Z",
+            "author": {
+              "login": "renovate"
+            },
+            "mergeStateStatus": "BLOCKED"
+          },
+          {
+            "number": 9,
+            "title": "draft renovate",
+            "url": "https://github.com/jay-withers/alpha/pull/9",
+            "isDraft": true,
+            "createdAt": "2026-10-30T18:00:00Z",
+            "updatedAt": "2026-10-30T18:00:00Z",
+            "author": {
+              "login": "renovate"
+            },
+            "mergeStateStatus": "BLOCKED"
+          },
+          {
+            "number": 10,
+            "title": "Fix the 'quoted' thing — ünïcode",
+            "url": "https://github.com/jay-withers/alpha/pull/10",
+            "isDraft": false,
+            "createdAt": "2026-09-30T18:00:00Z",
+            "updatedAt": "2026-10-20T18:00:00Z",
+            "author": {
+              "login": "someone"
+            },
+            "mergeStateStatus": "CLEAN"
+          },
+          {
+            "number": 11,
+            "title": "WIP: a parked draft",
+            "url": "https://github.com/jay-withers/alpha/pull/11",
+            "isDraft": true,
+            "createdAt": "2026-05-13T18:00:00Z",
+            "updatedAt": "2026-08-21T18:00:00Z",
+            "author": {
+              "login": "someone"
+            },
+            "mergeStateStatus": "CLEAN"
+          },
+          {
+            "number": 12,
+            "title": "Fresh work",
+            "url": "https://github.com/jay-withers/alpha/pull/12",
+            "isDraft": false,
+            "createdAt": "2026-11-27T18:00:00Z",
+            "updatedAt": "2026-11-27T18:00:00Z",
+            "author": {
+              "login": "someone"
+            },
+            "mergeStateStatus": "CLEAN"
+          },
+          {
+            "number": 13,
+            "title": "Orphaned author",
+            "url": "https://github.com/jay-withers/alpha/pull/13",
+            "isDraft": false,
+            "createdAt": "2026-10-15T18:00:00Z",
+            "updatedAt": "2026-10-15T18:00:00Z",
+            "author": null,
+            "mergeStateStatus": "CLEAN"
+          },
+          {
+            "number": 14,
+            "title": "Both 'single' and \"double\"\tand tab",
+            "url": "https://github.com/jay-withers/alpha/pull/14",
+            "isDraft": false,
+            "createdAt": "2026-10-10T18:00:00Z",
+            "updatedAt": "2026-10-10T18:00:00Z",
+            "author": {
+              "login": "someone"
+            },
+            "mergeStateStatus": "CLEAN"
+          }
+        ]
+      },
+      "closedPullRequests": {
+        "totalCount": 100,
+        "nodes": [
+          {
+            "author": {
+              "login": "someone"
+            }
+          }
+        ]
+      },
+      "branches": {
+        "totalCount": 60,
+        "nodes": [
+          {
+            "name": "main",
+            "target": {
+              "committedDate": "2026-02-02T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          },
+          {
+            "name": "feature/old",
+            "target": {
+              "committedDate": "2026-08-01T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          },
+          {
+            "name": "zeta",
+            "target": {
+              "committedDate": "2026-08-01T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          },
+          {
+            "name": "alpha-branch",
+            "target": {
+              "committedDate": "2026-07-02T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          },
+          {
+            "name": "has-pr",
+            "target": {
+              "committedDate": "2026-07-02T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 1
+            }
+          },
+          {
+            "name": "renovate/foo",
+            "target": {
+              "committedDate": "2026-07-02T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          },
+          {
+            "name": "fresh",
+            "target": {
+              "committedDate": "2026-11-24T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          },
+          {
+            "name": "tagless",
+            "target": {},
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          },
+          {
+            "name": "old-00",
+            "target": {
+              "committedDate": "2026-08-30T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          },
+          {
+            "name": "old-01",
+            "target": {
+              "committedDate": "2026-08-29T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          },
+          {
+            "name": "old-02",
+            "target": {
+              "committedDate": "2026-08-28T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          },
+          {
+            "name": "old-03",
+            "target": {
+              "committedDate": "2026-08-27T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          },
+          {
+            "name": "old-04",
+            "target": {
+              "committedDate": "2026-08-26T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          },
+          {
+            "name": "old-05",
+            "target": {
+              "committedDate": "2026-08-25T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          },
+          {
+            "name": "old-06",
+            "target": {
+              "committedDate": "2026-08-24T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          },
+          {
+            "name": "old-07",
+            "target": {
+              "committedDate": "2026-08-23T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          },
+          {
+            "name": "old-08",
+            "target": {
+              "committedDate": "2026-08-22T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          },
+          {
+            "name": "old-09",
+            "target": {
+              "committedDate": "2026-08-21T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          }
+        ]
+      },
+      "releases": {
+        "nodes": [
+          {
+            "tagName": "v1.2.3",
+            "publishedAt": "2026-11-20T18:00:00Z"
+          }
+        ]
+      }
+    },
+    "jay-withers/beta": {
+      "nameWithOwner": "jay-withers/beta",
+      "defaultBranchRef": {
+        "name": "main"
+      },
+      "renovate0": null,
+      "renovate1": null,
+      "renovate2": null,
+      "renovate3": null,
+      "renovate4": null,
+      "renovate5": null,
+      "readme": null,
+      "dockerfile": null,
+      "tflock": null,
+      "tflock_root": null,
+      "workflows": null,
+      "pullRequests": {
+        "totalCount": 0,
+        "nodes": []
+      },
+      "closedPullRequests": {
+        "totalCount": 0,
+        "nodes": []
+      },
+      "branches": {
+        "totalCount": 1,
+        "nodes": [
+          {
+            "name": "main",
+            "target": {
+              "committedDate": "2026-05-13T18:00:00Z"
+            },
+            "associatedPullRequests": {
+              "totalCount": 0
+            }
+          }
+        ]
+      },
+      "releases": {
+        "nodes": []
+      }
+    },
+    "jay-withers/gamma": {
+      "nameWithOwner": "jay-withers/gamma",
+      "defaultBranchRef": {
+        "name": "main"
+      },
+      "renovate0": null,
+      "renovate1": null,
+      "renovate2": {
+        "text": "{\"$schema\": \"https://docs.renovatebot.com/renovate-schema.json\", \"extends\": \"config:recommended\"}"
+      },
+      "renovate3": null,
+      "renovate4": null,
+      "renovate5": null,
+      "readme": {
+        "text": "# gamma\n"
+      },
+      "dockerfile": null,
+      "tflock": null,
+      "tflock_root": {
+        "text": "# This file is maintained automatically by \"terraform init\".\nprovider \"registry.terraform.io/hashicorp/azurerm\" {\n  version = \"4.1.0\"\n  hashes = [\n    \"h1:aaa=\",\n    \"h1:bbb=\",\n    \"h1:ccc=\",\n    \"zh:111\",\n  ]\n}\n\nprovider \"registry.terraform.io/hashicorp/random\" {\n  version = \"3.6.0\"\n  hashes = [\n    \"h1:ddd=\", \"h1:eee=\", \"h1:fff=\", \"zh:222\",\n  ]\n}\n"
+      },
+      "workflows": {
+        "entries": [
+          {
+            "name": "ci.yml",
+            "object": {
+              "text": "on: [push]\njobs:\n  x:\n    runs-on: ubuntu-latest\n"
+            }
+          }
+        ]
+      },
+      "pullRequests": {
+        "totalCount": 1,
+        "nodes": [
+          {
+            "number": 1,
+            "title": "Configure Renovate",
+            "url": "https://github.com/jay-withers/alpha/pull/1",
+            "isDraft": false,
+            "createdAt": "2026-11-14T18:00:00Z",
+            "updatedAt": "2026-11-14T18:00:00Z",
+            "author": {
+              "login": "renovate"
+            },
+            "mergeStateStatus": "CLEAN"
+          }
+        ]
+      },
+      "closedPullRequests": {
+        "totalCount": 0,
+        "nodes": []
+      },
+      "branches": {
+        "totalCount": 1,
+        "nodes": []
+      },
+      "releases": {
+        "nodes": []
+      }
+    },
+    "jay-withers/delta": {
+      "nameWithOwner": "jay-withers/delta",
+      "defaultBranchRef": {
+        "name": "main"
+      },
+      "renovate0": null,
+      "renovate1": {
+        "text": "// json5\n{\n  extends: [\"config:recommended\"],\n}\n"
+      },
+      "renovate2": null,
+      "renovate3": null,
+      "renovate4": null,
+      "renovate5": null,
+      "readme": {
+        "text": "# delta\n"
+      },
+      "dockerfile": {
+        "text": "FROM python:3.15@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nUSER 10001\n"
+      },
+      "tflock": null,
+      "tflock_root": null,
+      "workflows": {
+        "entries": [
+          {
+            "name": "ci.yml",
+            "object": {
+              "text": "on: [push, pull_request]\npermissions:\n  contents: read\njobs:\n  test:\n    name: \"Test\"\n    runs-on: ubuntu-latest\n  lint:\n    runs-on: ubuntu-latest\n"
+            }
+          },
+          {
+            "name": "paths.yml",
+            "object": {
+              "text": "on:\n  pull_request:\n    paths:\n      - 'src/**'\npermissions: {}\njobs:\n  build:\n    runs-on: ubuntu-latest\n"
+            }
+          }
+        ]
+      },
+      "pullRequests": {
+        "totalCount": 0,
+        "nodes": []
+      },
+      "closedPullRequests": {
+        "totalCount": 0,
+        "nodes": []
+      },
+      "branches": null,
+      "releases": {
+        "nodes": []
+      }
+    },
+    "jay-withers/epsilon": {
+      "nameWithOwner": "jay-withers/epsilon",
+      "defaultBranchRef": {
+        "name": "main"
+      },
+      "renovate0": {
+        "text": "{\"extends\": [\"github>jay-withers/renovate\"]}"
+      },
+      "renovate1": null,
+      "renovate2": null,
+      "renovate3": null,
+      "renovate4": null,
+      "renovate5": null,
+      "readme": {
+        "text": "# e\n"
+      },
+      "dockerfile": null,
+      "tflock": null,
+      "tflock_root": null,
+      "workflows": {
+        "entries": [
+          {
+            "name": "ci.yml",
+            "object": {
+              "text": "on: push\npermissions: read-all\njobs:\n  a:\n    runs-on: ubuntu-latest\n"
+            }
+          }
+        ]
+      },
+      "pullRequests": {
+        "totalCount": 0,
+        "nodes": []
+      },
+      "closedPullRequests": {
+        "totalCount": 0,
+        "nodes": []
+      },
+      "branches": {
+        "totalCount": 1,
+        "nodes": []
+      },
+      "releases": {
+        "nodes": []
+      }
+    }
+  },
+  "alerts": {
+    "jay-withers/alpha": [
+      {
+        "number": 1,
+        "rule": {
+          "id": "js/xss",
+          "severity": "error",
+          "security_severity_level": "high"
+        },
+        "created_at": "2026-10-10T18:00:00Z",
+        "html_url": "u",
+        "tool": {
+          "name": "CodeQL"
+        },
+        "most_recent_instance": {
+          "location": {
+            "path": "src/secret/path.js"
+          }
+        }
+      },
+      {
+        "number": 2,
+        "rule": {
+          "id": "js/xss",
+          "severity": "error",
+          "security_severity_level": "medium"
+        },
+        "created_at": "2026-11-09T18:00:00Z",
+        "tool": {
+          "name": "CodeQL"
+        }
+      },
+      {
+        "number": 3,
+        "rule": {
+          "id": "CVE-2026-0001",
+          "security_severity_level": "CRITICAL"
+        },
+        "created_at": "2026-11-26T18:00:00Z",
+        "tool": {
+          "name": "Trivy"
+        }
+      },
+      {
+        "number": 4,
+        "rule": {
+          "name": "quality-rule",
+          "severity": "warning"
+        },
+        "created_at": "2026-11-28T18:00:00Z"
+      },
+      {
+        "number": 5,
+        "rule": {},
+        "tool": {
+          "name": "CodeQL"
+        }
+      },
+      {
+        "number": 6,
+        "rule": {
+          "id": "r1",
+          "severity": "note"
+        },
+        "tool": {
+          "name": "CodeQL"
+        }
+      },
+      {
+        "number": 7,
+        "rule": {
+          "id": "r2",
+          "severity": "note"
+        },
+        "tool": {
+          "name": "CodeQL"
+        }
+      },
+      {
+        "number": 8,
+        "rule": {
+          "id": "r3",
+          "severity": "odd"
+        },
+        "tool": {
+          "name": "CodeQL"
+        }
+      }
+    ],
+    "jay-withers/beta": [],
+    "jay-withers/delta": [
+      {
+        "number": 1,
+        "rule": {
+          "id": "py/x",
+          "severity": "note"
+        },
+        "tool": {
+          "name": "CodeQL"
+        },
+        "created_at": "2025-10-25T18:00:00Z"
+      }
+    ],
+    "jay-withers/epsilon": [
+      {
+        "number": 1,
+        "rule": {
+          "id": "py/y",
+          "security_severity_level": "medium"
+        },
+        "tool": {
+          "name": "CodeQL"
+        }
+      }
+    ]
+  },
+  "alerts_missing": [
+    "jay-withers/gamma"
+  ],
+  "issues": {
+    "jay-withers/alpha": [
+      {
+        "number": 21,
+        "title": "Deploy of v1.2.3 failed",
+        "labels": [
+          {
+            "name": "deploy-failed"
+          }
+        ],
+        "created_at": "2026-11-25T18:00:00Z",
+        "html_url": "i"
+      },
+      {
+        "number": 22,
+        "title": "main's image build is failing",
+        "labels": [
+          {
+            "name": "build-failed"
+          },
+          {
+            "name": "bug"
+          }
+        ],
+        "created_at": "2026-11-27T18:00:00Z"
+      },
+      {
+        "number": 23,
+        "title": "Terraform plan has changes",
+        "labels": [
+          {
+            "name": "terraform-pending"
+          }
+        ],
+        "created_at": "2026-11-21T18:00:00Z"
+      },
+      {
+        "number": 24,
+        "title": "Deploy v1.2.4 (held)",
+        "labels": [
+          {
+            "name": "deploy-pending"
+          }
+        ],
+        "created_at": "2026-11-28T18:00:00Z"
+      },
+      {
+        "number": 25,
+        "title": "Deploy v1.2.5 (held)",
+        "labels": [
+          {
+            "name": "deploy-pending"
+          }
+        ],
+        "created_at": "2026-11-29T16:00:00Z"
+      },
+      {
+        "number": 26,
+        "title": "a PR",
+        "labels": [
+          {
+            "name": "deploy-failed"
+          }
+        ],
+        "pull_request": {
+          "url": "x"
+        }
+      },
+      {
+        "number": 27,
+        "title": "unlabelled",
+        "labels": []
+      }
+    ],
+    "jay-withers/beta": [],
+    "jay-withers/gamma": [
+      {
+        "number": 1,
+        "title": "Terraform 'x' pending",
+        "labels": [
+          {
+            "name": "terraform-pending"
+          }
+        ]
+      }
+    ]
+  },
+  "catalogue": "# The catalogue.\nrepos = {\n  \"alpha\" = {\n    description = \"x\" # a { brace in a comment\n    required_status_checks = [\n      { context = \"pre-commit / Pre-commit\" },\n      { context = \"lint\" },\n    ]\n  }\n  \"delta\" = {\n    description = \"d\"\n  }\n  \"gamma\" = {\n    code_scanning = true\n    required_status_checks = [\n      { context = \"x\" },\n    ]\n  }\n  \"epsilon\" = {\n    required_status_checks = [{ context = \"a\" }]\n  }\n}\nother = {\n  \"beta\" = {}\n}\n",
+  "prior_state": {
+    "version": 1,
+    "last_run": "2026-11-22T18:00:03.123456+00:00",
+    "findings": {
+      "ef913d3525dd": {
+        "first_seen": "2026-10-01",
+        "repo": "jay-withers/beta",
+        "check": "hygiene.no_readme",
+        "title": "no README"
+      },
+      "46f379ec2c84": {
+        "first_seen": "2026-09-01",
+        "repo": "jay-withers/alpha",
+        "check": "hygiene.no_readme",
+        "title": "no README"
+      },
+      "7a022494e409": {
+        "first_seen": "2026-09-02",
+        "repo": "jay-withers/zz",
+        "check": "old.check",
+        "title": "an old thing — gone"
+      },
+      "broken": {
+        "repo": "x"
+      }
+    },
+    "suppressed": {
+      "6ccf3a40efdc": {
+        "reason": "it's fine",
+        "until": "2027-01-01",
+        "added": "2026-11-01"
+      },
+      "e0c3147091b1": {
+        "reason": "parked",
+        "until": null,
+        "added": "2026-11-01"
+      },
+      "6398778f6c43": {
+        "reason": "expired",
+        "until": "2026-11-28",
+        "added": "2026-10-01"
+      },
+      "e05f1b8984a6": {
+        "reason": "orphan",
+        "added": "2026-10-01"
+      },
+      "a630988cacbe": {
+        "reason": "typo",
+        "until": "2027-13-45",
+        "added": "2026-10-01"
+      }
+    }
+  },
+  "email_to": "someone@example.com",
+  "deepseek": {
+    "reply": {
+      "summary": "  alpha's deploy failed: fix the release, then unblock the <DIRTY> lock-file PR.  ",
+      "order": [
+        "573a93e2b998",
+        "inventedid00",
+        "ea5e3271ab97",
+        "573a93e2b998",
+        "1af25dc5db6c"
+      ],
+      "themes": [
+        "unpinned actions",
+        "stale branches & PRs"
+      ],
+      "suggestions": [
+        {
+          "repo": "jay-withers/alpha",
+          "text": " Split the Dockerfile's build stage. "
+        },
+        {
+          "repo": "jay-withers/nope",
+          "text": "invented repo"
+        },
+        {
+          "repo": "",
+          "text": "Adopt one CI template across the estate."
+        },
+        {
+          "repo": "jay-withers/beta",
+          "text": "   "
+        },
+        {
+          "repo": "jay-withers/beta",
+          "text": "Archive it."
+        },
+        {
+          "repo": "jay-withers/delta",
+          "text": "Pin the json5."
+        },
+        {
+          "repo": "jay-withers/gamma",
+          "text": "One too many."
+        }
+      ],
+      "extra": "ignored"
+    },
+    "model": "deepseek-flash",
+    "usage": {
+      "prompt_tokens": 12345,
+      "prompt_cache_hit_tokens": 2345,
+      "completion_tokens": 1234567
+    },
+    "balance": {
+      "is_available": true,
+      "balance_infos": [
+        {
+          "currency": "CNY",
+          "total_balance": "100.00"
+        },
+        {
+          "currency": "USD",
+          "total_balance": "0.42"
+        }
+      ]
+    }
+  }
+}

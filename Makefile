@@ -10,7 +10,7 @@ IMAGE_TAG_EXPLICIT := $(filter-out file,$(origin IMAGE_TAG))
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install lint test typecheck run build push deploy deployed-tag smoke start logs state init fmt validate plan apply secrets
+.PHONY: help install lint test go-test go-render golden typecheck run build push deploy deployed-tag smoke start logs state init fmt validate plan apply secrets
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -22,10 +22,30 @@ install: ## Install mise tools, pre-commit hooks and Python dependencies
 	pre-commit install --hook-type commit-msg
 	uv sync --extra dev
 
-test: ## Run the test suite
+test: go-test ## Run the test suites: the Go port's, then the Python's
 	# --extra dev: pytest is an extra, not a dependency group, so `uv run` does
 	# not install it. Without this the target only works after `make install`.
 	uv run --extra dev pytest
+
+# The Go port, beside the Python until the cutover. The same checks CI's
+# go.yml runs: gofmt, vet, golangci-lint, and the race-enabled suite, which
+# includes the parity test against testdata/golden.
+go-test: ## Run the Go port's checks and tests (gofmt, vet, golangci-lint, go test -race)
+	@unformatted="$$(gofmt -l cmd internal)"; \
+		if [ -n "$$unformatted" ]; then echo "gofmt needed:"; echo "$$unformatted"; exit 1; fi
+	go vet ./...
+	golangci-lint run ./...
+	go test -race ./...
+
+# The Go port's `render`, for comparing against `make run` on the same day:
+# the two digests should be identical apart from the timing of the scan.
+go-render: ## Scan and print the digest with the Go port, sending no email
+	go run ./cmd/repoagent render
+
+# Rewrites testdata/golden/*/ from the Python scan replaying each fixture.
+# Run after changing a fixture; `make go-test` then proves the Go agrees.
+golden: ## Regenerate the Go port's golden files from the Python scan
+	uv run --extra dev python scripts/golden.py
 
 typecheck: ## Type-check src/ and tests/ with mypy (config in pyproject.toml)
 	uv run --extra dev mypy

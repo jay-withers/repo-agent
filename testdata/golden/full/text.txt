@@ -1,0 +1,135 @@
+Scanned 6 repositories.
+
+alpha's deploy failed: fix the release, then unblock the <DIRTY> lock-file PR.
+
+Themes: unpinned actions; stale branches & PRs
+
+34 finding(s), 33 new since last run:
+
+  [high] jay-withers/alpha: 1 failed deploy(s) not yet fixed (4d) [NEW]
+      #21 'Deploy of v1.2.3 failed'. Each issue links the failed run. Fix the cause and re-run it; the next successful run closes the issue.
+      https://github.com/jay-withers/alpha/issues?q=is%3Aissue+is%3Aopen+label%3Adeploy-failed
+  [high] jay-withers/beta: no Renovate configuration [NEW]
+      No renovate.json, renovate.json5 or .renovaterc at any path Renovate reads, so dependencies here are never updated automatically.
+      https://github.com/jay-withers/beta
+  [high] jay-withers/alpha: 2 Renovate PR(s) cannot merge (10d) [NEW]
+      #7 'chore(deps): lock file maintenance' (conflicts, open 10d), #8 'fix(deps): update "quoted" dep' (checks failing, open 6d). A required check is failing or the branch conflicts, so auto-merge will never take it and every update it carries stays unapplied. Open it and fix the failing check.
+      https://github.com/jay-withers/alpha/pulls?q=is%3Apr+is%3Aopen+author%3Aapp%2Frenovate
+  [high] jay-withers/alpha: Image build on main is failing (2d) [NEW]
+      #22 "main's image build is failing". The issue links the failed run: the image no longer builds, or Trivy found a fixable CRITICAL/HIGH vulnerability. Fix it on main; every Renovate PR fails container-build until then. The next green build closes it.
+      https://github.com/jay-withers/alpha/issues?q=is%3Aissue+is%3Aopen+label%3Abuild-failed
+  [high] jay-withers/alpha: 1 provider(s) locked for too few platforms [NEW]
+      random (1 of 3). CI runs amd64 and adds the missing hash during `init`, which modifies a tracked file and fails pre-commit on every pull request. Regenerate with `terraform providers lock -platform=linux_amd64 -platform=linux_arm64 -platform=darwin_arm64`.
+      https://github.com/jay-withers/alpha
+  [high] jay-withers/alpha: 1 required status check(s) nothing reports [NEW]
+      `lint` required by the github-repos catalogue, and no workflow in this repository produces that context. A required check that never reports leaves every pull request pending rather than failing it, so nothing merges except by bypassing the ruleset.
+      https://github.com/jay-withers/alpha/tree/main/.github/workflows
+  [high] jay-withers/alpha: Renovate updates are not being merged (25d) [NEW]
+      6 open Renovate PRs and the oldest has been open 25 days. Renovate stops opening new PRs once it hits prConcurrentLimit, so a backlog eventually becomes silence.
+      https://github.com/jay-withers/alpha/pulls?q=is%3Apr+is%3Aopen+author%3Aapp%2Frenovate
+  [high] jay-withers/alpha: 8 open CodeQL and Trivy and unknown tool alert(s) (50d) [NEW]
+      1 critical, 1 high, 1 medium, 1 warning, 2 note, 1 unrated, 1 odd. Rules: `js/xss` (2), `CVE-2026-0001`, `quality-rule`, `r1`, `r2` and 2 more rule(s). Code scanning reports without failing the build, so these sit in the Security tab until someone fixes or dismisses them.
+      https://github.com/jay-withers/alpha/security/code-scanning
+  [high] jay-withers/alpha: pull_request_target workflow handles the pull request's own code [NEW]
+      pr.yaml run on `pull_request_target` and reference `github.event.pull_request.head`. That job holds the base repository's secrets and token while working on code anyone can submit. Use `pull_request` for anything that builds or runs the change.
+      https://github.com/jay-withers/alpha/tree/main/.github/workflows
+  [high] jay-withers/alpha: 4 third-party action(s) pinned to a mutable tag [NEW]
+      fourth/one@v9, other/thing@main, some-org/some-action@v2 and others. A tag can be repointed by its owner at any time, and the job runs the new code with whatever secrets it holds. Pin to a commit SHA with the tag as a trailing comment.
+      https://github.com/jay-withers/alpha/tree/main/.github/workflows
+  [high] jay-withers/beta: not in the github-repos catalogue [NEW]
+      No entry in github-repos' terraform.tfvars, so nothing applies branch protection, required status checks, description or topics to it. It is outside the estate's controls rather than configured differently.
+      https://github.com/jay-withers/github-repos
+  [high] jay-withers/delta: Renovate has never opened a pull request here (30d) [NEW]
+      renovate.json5 is present and Renovate has run, but in 30 days it has never opened a single update PR. Check the Dependency Dashboard issue: updates sitting under "Awaiting Schedule" mean no Renovate job has landed inside the preset's weekly window. "Create all awaiting schedule PRs at once" clears the backlog; triggering a run on its own does not, because the run re-evaluates the schedule and parks them again.
+      https://github.com/jay-withers/delta
+  [high] jay-withers/gamma: Renovate onboarding PR never merged (15d) [NEW]
+      PR #1 is Renovate's onboarding pull request. Until it is merged Renovate opens no update PRs, so this repository looks configured but receives nothing.
+      https://github.com/jay-withers/alpha/pull/1
+  [medium] jay-withers/alpha: container runs as root [NEW]
+      `USER root`, so the process runs as root, and a runtime enforcing `runAsNonRoot` refuses it. Add a numeric `USER`, as this estate's template does.
+      https://github.com/jay-withers/alpha/blob/main/Dockerfile
+  [medium] jay-withers/alpha: 2 base image(s) not pinned to a digest [NEW]
+      golang:1.27, gcr.io/distroless/static-debian12. A tag can move under the next build. Pin as `image:tag@sha256:...` and let Renovate keep the digest current.
+      https://github.com/jay-withers/alpha/blob/main/Dockerfile
+  [medium] jay-withers/alpha: Releases waiting to be deployed (1d) [NEW]
+      #24 'Deploy v1.2.4 (held)', #25 'Deploy v1.2.5 (held)'. Each issue names the tag and why it was held. Run cd-publish from the Actions tab with that tag; the issue closes itself once it deploys.
+      https://github.com/jay-withers/alpha/issues?q=is%3Aissue+is%3Aopen+label%3Adeploy-pending
+  [medium] jay-withers/alpha: Terraform changes waiting to be applied (8d) [NEW]
+      #23 'Terraform plan has changes'. Review the plan the issue links, then run cd-terraform from the Actions tab to apply; the issue closes itself once nothing is left to apply.
+      https://github.com/jay-withers/alpha/issues?q=is%3Aissue+is%3Aopen+label%3Aterraform-pending
+  [medium] jay-withers/alpha: 2 pull request check(s) nothing requires [NEW]
+      `Test` (ci.yml) not in this repository's `required_status_checks` in the github-repos catalogue, so a red run does not block a merge — and a Renovate pull request, auto-approved and auto-merged, never has a human to notice. Each runs on every pull request, so each can be required without leaving one pending. Read the exact context off `gh pr checks` rather than inferring it. CodeQL runs (ci.yml) but the catalogue entry does not set `code_scanning = true`, so a new alert does not block a merge. Set that rather than requiring the CodeQL status check.
+      https://github.com/jay-withers/github-repos
+  [medium] jay-withers/alpha: workflow uses a retired runner image [NEW]
+      ubuntu-20.04 (ci.yml, reusable.yml), windows-2019 (pr.yaml). A retired image stops being provisioned on a date GitHub sets, and every workflow asking for it fails that morning.
+      https://github.com/jay-withers/alpha/tree/main/.github/workflows
+  [medium] jay-withers/alpha: 1 workflow(s) with an unscoped GITHUB_TOKEN [NEW]
+      ci.yml set no `permissions:`, so the token takes the repository default, which can be write access to everything. Add a top-level `permissions: contents: read` and widen per job where needed.
+      https://github.com/jay-withers/alpha/tree/main/.github/workflows
+  [medium] jay-withers/beta: public repository with no licence [NEW]
+      GitHub detects no licence, which in most jurisdictions means nobody may legally reuse the code regardless of it being public.
+      https://github.com/jay-withers/beta
+  [medium] jay-withers/beta: no README
+      Nothing at README.md, so the repository's front page is a file listing.
+      https://github.com/jay-withers/beta
+  [medium] jay-withers/delta: 2 pull request check(s) nothing requires [NEW]
+      `Test` (ci.yml), `lint` (ci.yml) not in this repository's `required_status_checks` in the github-repos catalogue, so a red run does not block a merge — and a Renovate pull request, auto-approved and auto-merged, never has a human to notice. Each runs on every pull request, so each can be required without leaving one pending. Read the exact context off `gh pr checks` rather than inferring it.
+      https://github.com/jay-withers/github-repos
+  [medium] jay-withers/epsilon: 1 open CodeQL alert(s) [NEW]
+      1 medium. Rules: `py/y`. Code scanning reports without failing the build, so these sit in the Security tab until someone fixes or dismisses them.
+      https://github.com/jay-withers/epsilon/security/code-scanning
+  [medium] jay-withers/gamma: Terraform changes waiting to be applied [NEW]
+      #1 "Terraform 'x' pending". Review the plan the issue links, then run cd-terraform from the Actions tab to apply; the issue closes itself once nothing is left to apply.
+      https://github.com/jay-withers/gamma/issues?q=is%3Aissue+is%3Aopen+label%3Aterraform-pending
+  [medium] jay-withers/gamma: 1 workflow(s) with an unscoped GITHUB_TOKEN [NEW]
+      ci.yml set no `permissions:`, so the token takes the repository default, which can be write access to everything. Add a top-level `permissions: contents: read` and widen per job where needed.
+      https://github.com/jay-withers/gamma/tree/main/.github/workflows
+  [low] jay-withers/alpha: at least 4 abandoned pull request(s) (100d) [NEW]
+      #11 'WIP: a parked draft' (draft) by someone, idle 100d, #14 'Both \'single\' and "double"\tand tab' by someone, idle 50d, #13 'Orphaned author' by unknown, idle 45d, #10 "Fix the 'quoted' thing — ünïcode" by someone, idle 40d. Merge, close or mark as draft; an open pull request nobody is working on goes on conflicting with everything that does merge.
+      https://github.com/jay-withers/alpha/pulls
+  [low] jay-withers/alpha: at least 13 stale branch(es) with no open pull request (150d) [NEW]
+      alpha-branch (150d), zeta (120d), feature/old (120d), old-09 (100d), old-08 (99d), old-07 (98d), old-06 (97d), old-05 (96d), old-04 (95d), old-03 (94d) and 3 more. Delete them if merged, or open a pull request if the work is still wanted. Enabling `delete_branch_on_merge` in github-repos stops the merged ones recurring.
+      https://github.com/jay-withers/alpha/branches/stale
+  [low] jay-withers/alpha: 2 GitHub-owned action(s) pinned to a tag [NEW]
+      actions/checkout@v4, github/codeql-action/init@v3. Lower risk than a third-party action, since the tag is moved by GitHub itself, but still a moving reference.
+      https://github.com/jay-withers/alpha/tree/main/.github/workflows
+  [low] jay-withers/beta: no CI workflows [NEW]
+      No .github/workflows/*.yml. Nothing runs on push or pull request.
+      https://github.com/jay-withers/beta
+  [low] jay-withers/delta: Renovate config does not extend the shared preset [NEW]
+      renovate.json5 does not extend github>jay-withers/renovate, so changes to the estate's central Renovate policy never reach this repository.
+      https://github.com/jay-withers/delta/blob/main/renovate.json5
+  [low] jay-withers/delta: 1 open CodeQL alert(s) (400d) [NEW]
+      1 note. Rules: `py/x`. Code scanning reports without failing the build, so these sit in the Security tab until someone fixes or dismisses them.
+      https://github.com/jay-withers/delta/security/code-scanning
+  [low] jay-withers/gamma: Renovate config does not extend the shared preset [NEW]
+      .github/renovate.json does not extend github>jay-withers/renovate, so changes to the estate's central Renovate policy never reach this repository.
+      https://github.com/jay-withers/gamma/blob/main/.github/renovate.json
+  [low] jay-withers/gamma: Renovate config is the untouched default [NEW]
+      .github/renovate.json extends only Renovate's stock presets and sets nothing else — no shared preset, no packageRules, no schedule and no grouping, so every update arrives as its own unscheduled PR.
+      https://github.com/jay-withers/gamma/blob/main/.github/renovate.json
+
+Resolved since last run (2):
+  jay-withers/alpha: no README
+  jay-withers/zz: an old thing — gone
+
+2 finding(s) suppressed. `repoagent state` lists them.
+
+Suggestions (model opinion, not checked):
+  - jay-withers/alpha: Split the Dockerfile's build stage.
+  - Adopt one CI template across the estate.
+  - jay-withers/beta: Archive it.
+  - jay-withers/delta: Pin the json5.
+
+Ignored by topic: jay-withers/tut (Tutorial)
+
+Repositories:
+  jay-withers/alpha
+  jay-withers/archived-one  [archived, no description]
+  jay-withers/beta  [no description]
+  jay-withers/delta
+  jay-withers/epsilon
+  jay-withers/gamma
+
+repo-agent v9.9.9
+triage deepseek-flash · 12,345 in (2,345 cached) / 1,234,567 out · ~$0.7422 · $0.42 left

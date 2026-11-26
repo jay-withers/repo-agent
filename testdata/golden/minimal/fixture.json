@@ -1,0 +1,66 @@
+{
+  "now": "2026-11-26T09:30:00+00:00",
+  "send_email": false,
+  "image_tag": null,
+  "permissions": {
+    "metadata": "read"
+  },
+  "repos": [
+    {
+      "name": "solo",
+      "full_name": "jay-withers/solo",
+      "description": "Solo <b>",
+      "default_branch": "main",
+      "archived": false,
+      "pushed_at": "2026-11-27T18:00:00Z",
+      "created_at": "2025-10-25T18:00:00Z",
+      "topics": [],
+      "license": {
+        "key": "mit"
+      },
+      "html_url": "https://github.com/jay-withers/solo",
+      "private": false
+    },
+    {
+      "name": "other",
+      "full_name": "jay-withers/other",
+      "description": "The other repository",
+      "default_branch": "main",
+      "archived": true,
+      "pushed_at": "2026-11-27T18:00:00Z",
+      "created_at": "2025-10-25T18:00:00Z",
+      "topics": [],
+      "license": {
+        "key": "mit"
+      },
+      "html_url": "https://github.com/jay-withers/other",
+      "private": false
+    },
+    {
+      "name": "skip",
+      "full_name": "jay-withers/skip",
+      "description": "The skip repository",
+      "default_branch": "main",
+      "archived": false,
+      "pushed_at": "2026-11-27T18:00:00Z",
+      "created_at": "2025-10-25T18:00:00Z",
+      "topics": [
+        "no-scan"
+      ],
+      "license": {
+        "key": "mit"
+      },
+      "html_url": "https://github.com/jay-withers/skip",
+      "private": false
+    }
+  ],
+  "detail_error": "Something went wrong while executing your query.",
+  "details": {},
+  "alerts": {},
+  "alerts_missing": [],
+  "issues": {},
+  "catalogue": null,
+  "prior_state": null,
+  "email_to": null,
+  "deepseek": null
+}
