@@ -1,9 +1,11 @@
 package scan
 
-// The parity test: the Go scan, replayed against the fixture the Python scan
-// rendered testdata/golden from (scripts/golden.py, `make golden`), must
-// produce the same digest, the same DeepSeek prompt, the same GraphQL query
-// and the same state document, byte for byte.
+// The golden test: the scan, replayed against each testdata/golden fixture,
+// must produce the same digest, DeepSeek prompt, GraphQL query and state
+// document as the golden files, byte for byte. The Python implementation
+// wrote them before the port, so they began as the proof the port changed
+// nothing; now they pin the output. Nothing regenerates them: a deliberate
+// change to an output edits its golden file in the same PR.
 
 import (
 	"bytes"
@@ -213,7 +215,7 @@ func compare(t *testing.T, scenario, name, got string) {
 	t.Helper()
 	want, err := os.ReadFile(filepath.Join(goldenDir, scenario, name))
 	if err != nil {
-		t.Fatalf("%s/%s: %v (run `make golden`)", scenario, name, err)
+		t.Fatalf("%s/%s: %v (a new scenario needs its golden files written and reviewed by hand)", scenario, name, err)
 	}
 	if got == string(want) {
 		return
@@ -228,11 +230,11 @@ func compare(t *testing.T, scenario, name, got string) {
 			w = wl[i]
 		}
 		if g != w {
-			t.Errorf("%s/%s differs from the Python at line %d:\n  go:     %q\n  python: %q", scenario, name, i+1, g, w)
+			t.Errorf("%s/%s differs from the golden file at line %d:\n  got:    %q\n  golden: %q", scenario, name, i+1, g, w)
 			return
 		}
 	}
-	t.Errorf("%s/%s differs from the Python", scenario, name)
+	t.Errorf("%s/%s differs from the golden file", scenario, name)
 }
 
 func TestGoldenParity(t *testing.T) {
@@ -262,7 +264,7 @@ func loadFixture(t *testing.T, scenario string) fixture {
 	return fx
 }
 
-// setupScenario puts the process where the Python harness put it: an empty
+// setupScenario puts the process where the golden files were written: an empty
 // directory, the fixture's secrets and clock, no sleeping, and the fixture's
 // prior state in a store that records what is saved.
 func setupScenario(t *testing.T, fx fixture) *memStore {
@@ -333,7 +335,7 @@ func runGolden(t *testing.T, scenario string) {
 		case statErr == nil:
 			compare(t, scenario, name, value)
 		case value != "":
-			t.Errorf("%s/%s: the Go produced one and the Python did not", scenario, name)
+			t.Errorf("%s/%s: the scan produced one and there is no golden file", scenario, name)
 		}
 	}
 	expect("prompt.json", got.prompt)

@@ -1,7 +1,8 @@
 // Package fetch is the shared HTTP plumbing for the outbound APIs: GitHub,
 // DeepSeek and Resend.
 //
-// The rules are the Python fetch.py's, which was copied from market-agent:
+// The rules are the ones the Python implementation had, first copied from
+// market-agent:
 //
 //   - GET and GraphQL are retried on RetryableStatus and on transport
 //     errors, three attempts, linear backoff, honouring Retry-After (capped at

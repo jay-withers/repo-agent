@@ -32,23 +32,16 @@ override.tf.json
 .DS_Store
 **/.DS_Store
 
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-*.egg-info/
-.pytest_cache/
-.ruff_cache/
-# pytest-cov's data file. Coverage runs in CI rather than in `make test`, so
-# this only appears if someone measures locally by hand.
-.coverage
+# Go coverage profiles, if someone measures locally by hand (CI does it).
+coverage.out
+*.coverprofile
 
 # Node
 node_modules/
 dist/
 
-# Local environment files. Every secret is read from an env var first (see
-# apps/marketagent/src/marketagent/settings.py), so these hold real values.
+# Local environment files. Every secret is read from an env var, then .env
+# (see internal/settings), so these hold real values.
 .env
 .env.*
 # ...but a committed template holds none, and `.env.*` would otherwise swallow

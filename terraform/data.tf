@@ -12,14 +12,6 @@ data "azurerm_container_app_environment" "platform" {
   resource_group_name = var.platform_resource_group_name
 }
 
-# The connection string the job needs. Read from the shared resource rather
-# than passed in as a variable, so it cannot drift from what the platform
-# actually deployed.
-data "azurerm_application_insights" "platform" {
-  name                = var.platform_app_insights_name
-  resource_group_name = var.platform_resource_group_name
-}
-
 # This project's resource group, created by github-repos along with the
 # pipeline identity's grants on it. Same name the naming module always gave
 # it; github-repos puts it in the shared environment's region.

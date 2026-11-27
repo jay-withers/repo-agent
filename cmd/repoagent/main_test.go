@@ -99,7 +99,7 @@ func TestSuppressAndUnsuppress(t *testing.T) {
 	store := &memStore{data: []byte(`{"findings": {"abc": {"first_seen": "2026-01-01"}}}`)}
 	isolate(t, store)
 	code, out, _ := runCLI("suppress", "abc", "--reason", "known", "--until", "2027-01-01")
-	if code != 0 || !strings.Contains(out, "INFO    repoagent.state state updated: abc suppressd") {
+	if code != 0 || !strings.Contains(out, "INFO    repoagent.state state updated: abc suppressed") {
 		t.Errorf("exit %d: %s", code, out)
 	}
 	saved, _ := state.FromJSON(store.written)
@@ -109,8 +109,8 @@ func TestSuppressAndUnsuppress(t *testing.T) {
 	}
 
 	store.data = store.written
-	if code, _, _ := runCLI("unsuppress", "abc"); code != 0 {
-		t.Error("unsuppress")
+	if code, out, _ := runCLI("unsuppress", "abc"); code != 0 || !strings.Contains(out, "state updated: abc unsuppressed") {
+		t.Errorf("unsuppress: exit %d: %s", code, out)
 	}
 	if saved, _ := state.FromJSON(store.written); len(saved.Suppressed) != 0 {
 		t.Error("still suppressed")

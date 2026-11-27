@@ -65,23 +65,6 @@ repos:
     hooks:
       - id: hadolint-docker
 
-  # ruff replaces both a linter and a formatter (black/isort/flake8). The
-  # config, including the rule selection, lives in
-  # apps/marketagent/pyproject.toml — ruff walks up from each file to find it,
-  # so nothing needs pointing at it from here.
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 9026c9127e153371d7a78dfcb0c45ae2046a3d10 # frozen: v0.17.6
-    hooks:
-      - id: ruff-check
-        args: [--fix]
-
-      # Python only. The upstream hook's types_or includes `markdown`, so left
-      # alone it reformats Python code blocks inside .md files — it rewrote the
-      # aligned comments in docs/deployment-plan.md on its first run. Prose is
-      # not ruff's business.
-      - id: ruff-format
-        types_or: [python, pyi]
-
   - repo: local
     hooks:
       # Replaces the upstream hadolint-docker hook: that one calls

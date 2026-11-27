@@ -27,12 +27,6 @@ variable "platform_environment_name" {
   default     = "cae-platform-dev"
 }
 
-variable "platform_app_insights_name" {
-  description = "Name of the shared Application Insights instance the job reports telemetry to."
-  type        = string
-  default     = "appi-platform-dev"
-}
-
 # --- this project -------------------------------------------------------------
 
 variable "tags" {

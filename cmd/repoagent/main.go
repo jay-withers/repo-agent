@@ -206,7 +206,7 @@ func stateCommand(a args, stdout io.Writer) int {
 		stateLog.Error("could not write the state document; nothing was changed")
 		return 1
 	}
-	stateLog.Info(fmt.Sprintf("state updated: %s %sd", a.findingID, a.command))
+	stateLog.Info(fmt.Sprintf("state updated: %s %sed", a.findingID, a.command))
 	return 0
 }
 

@@ -52,7 +52,7 @@ jobs:
           if [ -z "$prev_tag" ]; then
             echo "no previous release tag — publishing unconditionally"
             echo "apps=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet "$prev_tag"..HEAD -- src/ Dockerfile pyproject.toml uv.lock; then
+          elif git diff --quiet "$prev_tag"..HEAD -- cmd/ internal/ go.mod go.sum Dockerfile; then
             echo "apps=false" >> "$GITHUB_OUTPUT"
           else
             echo "apps=true" >> "$GITHUB_OUTPUT"

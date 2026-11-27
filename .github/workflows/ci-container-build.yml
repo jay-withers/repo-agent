@@ -47,10 +47,11 @@ jobs:
         with:
           filters: |
             image:
-              - 'src/**'
+              - 'cmd/**'
+              - 'internal/**'
+              - 'go.mod'
+              - 'go.sum'
               - 'Dockerfile'
-              - 'pyproject.toml'
-              - 'uv.lock'
               - 'mise.toml'
               - '.github/workflows/ci-container-build.yml'
 
@@ -71,7 +72,7 @@ jobs:
     uses: jay-withers/workflows/.github/workflows/docker.yml@ca86e90ed1f90f0afae1c2f2fc5a20c3a2115287 # v1.35.0
     with:
       images: |
-        [{"name": "repoagent", "context": ".", "python": "python"}]
+        [{"name": "repoagent", "context": "."}]
       failure-issue: ${{ github.event_name != 'pull_request' }}
 
   # The required status check ("container-build"). Skipped counts as success,

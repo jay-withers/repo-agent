@@ -6,54 +6,50 @@
 # must pass --platform linux/amd64. The Makefile's `build` target does it rather
 # than leaving it to memory.
 
-# Both stages come from jay-withers/dev-containers, which holds what every
-# Python app here used to repeat: the Python digest, Debian security updates,
-# pip's removal, the uid 10001 user, and uv for the builder. Keep the two at the
-# same version — Renovate raises them together. python-app-builder is built FROM
-# python-app, and that is load-bearing rather than tidy: the runtime stage
-# copies the whole virtualenv, and a venv is bound to the exact minor version
-# that created it. See jay-withers/gym-log's Dockerfile for the outage that
-# taught this.
-FROM ghcr.io/jay-withers/dev-containers/python-app-builder:v0.24.2@sha256:1a87995ea7ea01803421c1a20d8de386f73de2b2381baccdded962c4bc4451ca AS builder
+# The builder is the official Go image at **exactly mise.toml's go**: local
+# runs and CI test with that Go, and this is the one that compiles what ships.
+# The shared Renovate preset (jay-withers/renovate go.json) moves this tag in
+# the same "mise tools" PR as mise.toml's go, so the two cannot drift. Keep the
+# full patch version in the tag, or a mise patch would move alone.
+FROM golang:1.27.4-trixie@sha256:430985542100b871e108ccc00e8dcc5eef08ca14ee5825e98ebf563d8ffec4ee AS builder
 
-# python-app already sets this; restated because the relative COPYs below
-# depend on it, and hadolint cannot see a WORKDIR set by the parent image.
-WORKDIR /app
+WORKDIR /src
 
-# Dependencies before source, so editing a module does not re-resolve the whole
-# environment. --frozen fails rather than silently updating uv.lock, which is
-# what makes the image reproducible.
-COPY pyproject.toml uv.lock ./
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project --no-dev --no-editable
+# Modules before source, so editing a package does not re-download them.
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
-COPY src ./src
-# --no-editable matters: without it uv installs the project as a link back to
-# /app/src, and the runtime stage copies only the virtualenv — leaving a .pth
-# pointing at a directory that does not exist there. The failure is a bare
-# "No module named 'repoagent'" from an image whose venv looks complete.
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-editable
+COPY cmd ./cmd
+COPY internal ./internal
+# CGO off: a static binary, which is what lets the runtime image have no libc.
+# -trimpath keeps the builder's paths out of the binary; -s -w drops the
+# symbol tables nothing reads in production. GOTOOLCHAIN=local, as in CI.
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=local \
+    go build -trimpath -ldflags="-s -w" -o /out/repoagent ./cmd/repoagent
 
 
-# Brings /app/.venv/bin on PATH and WORKDIR /app.
-FROM ghcr.io/jay-withers/dev-containers/python-app:v0.24.2@sha256:e73c66b05bbcf150d13c4f6366994f55002d4cf03b9b079196b97325388db3a1
+# Distroless static: CA certificates, tzdata and /etc/passwd, and nothing
+# else: no shell, no package manager, nothing for Trivy to find but the
+# binary. Unlike the estate's Python apps, this is not built on
+# dev-containers' python-app (a deliberate exception, see docs/design.md).
+FROM gcr.io/distroless/static-debian13@sha256:4c2cd1dee442c9a99924a378c7c126fac8fef14771579ef567c3f2bdd7a5122a
 
 # This label is what connects the pushed package to this repository, and that
 # connection is what gives a workflow's GITHUB_TOKEN write access to it. Without
 # it a package pushed by hand is user-scoped and unlinked, and cd-publish fails
 # with `denied: permission_denied: write_package` however its `packages: write`
 # permission is declared.
-# It also replaces the label python-app inherits, which would otherwise link
-# this image to dev-containers.
 LABEL org.opencontainers.image.source="https://github.com/jay-withers/repo-agent"
 
-COPY --from=builder --chown=10001:10001 /app/.venv /app/.venv
+# On PATH, so the ENTRYPOINT below resolves by name as the Python console
+# script did.
+COPY --from=builder /out/repoagent /usr/local/bin/repoagent
 
-# python-app already runs as this user; restated so this file alone says the
-# image is non-root (repo-agent's container.runs_as_root reads only this file)
-# and stays so if the base ever changes. Numeric, because a runtime enforcing
-# runAsNonRoot has to resolve the user without reading /etc/passwd.
+# Numeric, because a runtime enforcing runAsNonRoot has to resolve the user
+# without reading /etc/passwd, and the same uid the Python image ran as, so
+# nothing about the job's identity changes. repo-agent's container.runs_as_root
+# reads only this file.
 USER 10001
 
 # No EXPOSE and no HEALTHCHECK: this image serves nothing. It is a job that runs
@@ -62,8 +58,8 @@ USER 10001
 
 # **This ENTRYPOINT is the single source of truth for the executable's name.**
 # Terraform deliberately sets no `command` on the job — it sets `args` only — so
-# that renaming the console script is one atomic change here rather than a
-# change that has to be mirrored in another repository's Terraform. See
+# that renaming the binary is one atomic change here rather than a change that
+# has to be mirrored in another repository's Terraform. See
 # terraform/main.container-apps-jobs.tf for the outage that taught this.
 ENTRYPOINT ["repoagent"]
 CMD ["scan"]

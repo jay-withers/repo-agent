@@ -20,8 +20,7 @@ indent_style = tab
 [*.md]
 trim_trailing_whitespace = false
 
-# ruff formats Python at 4 spaces; the 2-space default above is for everything
-# else. Without this a hand-typed file disagrees with the formatter that will
-# rewrite it on commit.
-[*.py]
-indent_size = 4
+# gofmt indents Go with tabs, so an editor typing spaces disagrees with the
+# formatter make test and CI run.
+[*.go]
+indent_style = tab
